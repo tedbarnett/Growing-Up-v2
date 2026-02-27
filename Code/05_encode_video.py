@@ -25,18 +25,21 @@ def count_frames():
     return len(frames)
 
 
-def encode_video(config, output_name="growing_up_ted.mp4", music_paths=None,
+def encode_video(config, output_name=None, music_paths=None,
                  crf=18, preset="slow"):
     """
     Encode frames to MP4 using FFmpeg.
 
     Parameters:
         config: config dict
-        output_name: output filename
+        output_name: output filename (default: derived from subject_name)
         music_paths: optional list of paths to music file(s)
         crf: constant rate factor (lower = better quality, 18 is visually lossless)
         preset: encoding speed/quality tradeoff
     """
+    if output_name is None:
+        subject = config.get("subject_name", "Video")
+        output_name = f"Growing Up - {subject}.mp4"
     fps = config.get("fps", 30)
     output_path = OUTPUT_DIR / output_name
 
@@ -108,10 +111,32 @@ def encode_video(config, output_name="growing_up_ted.mp4", music_paths=None,
             "-shortest",  # End when shortest stream ends
         ])
     elif len(music_paths) > 1:
-        # Multiple files: concat audio inputs, then apply delay + fade
+        # Multiple files: crossfade between songs (3s overlap) then apply delay + fade
         n = len(music_paths)
-        concat_inputs = "".join(f"[{i+1}:a]" for i in range(n))
-        filter_parts = [f"{concat_inputs}concat=n={n}:v=0:a=1[acat]"]
+        crossfade_duration = 3  # seconds of overlap between songs
+        filter_parts = []
+
+        if n == 2:
+            # Two songs: single acrossfade
+            filter_parts.append(
+                f"[1:a][2:a]acrossfade=d={crossfade_duration}:c1=tri:c2=tri[acat]"
+            )
+        else:
+            # Chain acrossfade for 3+ songs
+            filter_parts.append(
+                f"[1:a][2:a]acrossfade=d={crossfade_duration}:c1=tri:c2=tri[a01]"
+            )
+            for i in range(2, n - 1):
+                prev_label = f"a{i-2:02d}{i-1:02d}" if i > 2 else "a01"
+                next_label = f"a{i-1:02d}{i:02d}"
+                filter_parts.append(
+                    f"[{prev_label}][{i+1}:a]acrossfade=d={crossfade_duration}:c1=tri:c2=tri[{next_label}]"
+                )
+            # Last crossfade
+            last_prev = f"a{n-3:02d}{n-2:02d}" if n > 3 else "a01"
+            filter_parts.append(
+                f"[{last_prev}][{n}:a]acrossfade=d={crossfade_duration}:c1=tri:c2=tri[acat]"
+            )
 
         delay_fade = []
         if music_delay_s > 0:
@@ -191,8 +216,9 @@ def add_year_overlay(config, manifest):
         return
 
     # Build complex FFmpeg drawtext filter
-    input_video = OUTPUT_DIR / "growing_up_ted.mp4"
-    output_video = OUTPUT_DIR / "growing_up_ted_with_years.mp4"
+    subject = config.get("subject_name", "Video")
+    input_video = OUTPUT_DIR / f"Growing Up - {subject}.mp4"
+    output_video = OUTPUT_DIR / f"Growing Up - {subject} (with years).mp4"
 
     if not input_video.exists():
         print(f"ERROR: {input_video} not found. Run basic encoding first.")
@@ -249,8 +275,8 @@ def main():
                         help="Encoding speed/quality tradeoff")
     parser.add_argument("--add-year-labels", action="store_true",
                         help="Create a second version with year overlays")
-    parser.add_argument("--output", type=str, default="growing_up_ted.mp4",
-                        help="Output filename")
+    parser.add_argument("--output", type=str, default=None,
+                        help="Output filename (default: derived from subject name)")
     args = parser.parse_args()
 
     config = load_config()

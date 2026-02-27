@@ -4,16 +4,23 @@ Writes job_status.json for SSE polling.
 """
 
 import json
+import os
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
 # Project root (parent of webapp/)
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CODE_DIR = PROJECT_ROOT / "Code"
-VENV_PYTHON = str(PROJECT_ROOT / "venv" / "bin" / "python")
+PROJECT_ROOT = Path(os.environ.get("GROWUP_PROJECT_ROOT",
+                    str(Path(__file__).resolve().parent.parent)))
+CODE_DIR = Path(os.environ.get("GROWUP_CODE_DIR",
+                str(Path(__file__).resolve().parent.parent / "Code")))
+if getattr(sys, 'frozen', False):
+    VENV_PYTHON = sys.executable
+else:
+    VENV_PYTHON = str(PROJECT_ROOT / "venv" / "bin" / "python")
 
 # Phase 1: image processing (steps 00-03)
 PROCESS_STEPS = [
@@ -63,7 +70,6 @@ def _write_status(subject_dir, status_dict):
 
 def _build_env(subject_dir, config):
     """Build environment variables for subprocess."""
-    import os
     env = os.environ.copy()
     subject_dir = Path(subject_dir)
 

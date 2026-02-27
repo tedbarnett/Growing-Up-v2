@@ -334,6 +334,68 @@ def render_end_title_card(output_size, subject_name, fps, frames_dir, start_fram
     return frame_num
 
 
+def render_credit_card(output_size, fps, frames_dir, start_frame_num):
+    """
+    Render a Barnett Labs credit card: black screen with copyright text
+    fading in at the bottom, then holding for 3 seconds.
+
+    Returns the next frame number.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    from datetime import date
+
+    fade_in_duration = int(1 * fps)
+    hold_duration = int(3 * fps)
+    total = fade_in_duration + hold_duration
+
+    year = date.today().year
+    credit_text = f"\u00a9{year} Barnett Labs (barnettlabs.com)"
+
+    # Load a smaller font for the credit line
+    font_size = int(output_size * 0.035)
+    font = None
+    for font_name in [
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/HelveticaNeue.ttc",
+        "/Library/Fonts/Arial.ttf",
+    ]:
+        try:
+            font = ImageFont.truetype(font_name, font_size)
+            break
+        except (OSError, IOError):
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    # Measure text
+    tmp_img = Image.new("RGB", (output_size, output_size), (0, 0, 0))
+    draw = ImageDraw.Draw(tmp_img)
+    bbox = draw.textbbox((0, 0), credit_text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    x = (output_size - text_w) // 2
+    y = output_size - text_h - int(output_size * 0.08)  # Near bottom
+
+    frame_num = start_frame_num
+    for i in range(total):
+        pil_img = Image.new("RGB", (output_size, output_size), (0, 0, 0))
+        draw = ImageDraw.Draw(pil_img)
+
+        if i < fade_in_duration:
+            alpha = int(255 * ((i + 1) / fade_in_duration))
+        else:
+            alpha = 255
+
+        draw.text((x, y), credit_text, font=font, fill=(alpha, alpha, alpha))
+        frame_bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        frame_path = frames_dir / f"frame_{frame_num:06d}.png"
+        cv2.imwrite(str(frame_path), frame_bgr)
+        frame_num += 1
+
+    print(f"  Credit card: {total} frames ({total/fps:.1f}s)")
+    return frame_num
+
+
 def scale_and_shift_image(img, scale, shift_y, output_size):
     """
     Scale image around center and shift vertically.
@@ -592,6 +654,9 @@ def render_sequence(manifest, config, use_crossfade=False,
     # Render end title card (fade in name from black, hold 3s)
     if subject_name:
         frame_num = render_end_title_card(output_size, subject_name, fps, FRAMES_DIR, frame_num)
+
+    # Render Barnett Labs credit card (fade in at bottom, hold 3s)
+    frame_num = render_credit_card(output_size, fps, FRAMES_DIR, frame_num)
 
     # Write timing info for video encoder (music delay, etc.)
     title_card_duration = 3.0 if subject_name else 0.0  # 2s hold + 1s fade

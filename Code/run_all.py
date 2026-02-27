@@ -14,7 +14,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from utils import PROJECT_ROOT, OUTPUT_DIR, load_config
+
 VENV_PYTHON = PROJECT_ROOT / "venv" / "bin" / "python"
 SCRIPTS_DIR = PROJECT_ROOT / "Code"
 
@@ -77,7 +79,9 @@ def main():
     print("PIPELINE COMPLETE!")
     print(f"{'='*60}")
     print(f"\nOpen the video:")
-    print(f'  open "{PROJECT_ROOT / "Output" / "growing_up_ted.mp4"}"')
+    config = load_config()
+    subject = config.get("subject_name", "Video")
+    print(f'  open "{OUTPUT_DIR / f"Growing Up - {subject}.mp4"}"')
 
 
 if __name__ == "__main__":

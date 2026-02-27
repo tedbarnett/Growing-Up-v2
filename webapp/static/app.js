@@ -716,7 +716,7 @@ function updateScrubberDuration() {
     var morph = window.PIPELINE_MORPH || 30;
     var titleFrames = 3 * fps;
     var imageFrames = n * hold + hold + (n - 1) * morph;
-    var endingFrames = 3 * fps + 3 * fps;
+    var endingFrames = 3 * fps + 3 * fps + 4 * fps;
     var totalSeconds = Math.round((titleFrames + imageFrames + endingFrames) / fps);
     var mins = Math.floor(totalSeconds / 60);
     var secs = totalSeconds % 60;

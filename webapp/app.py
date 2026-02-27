@@ -245,10 +245,10 @@ def get_projected_video_duration(name):
     hold = config.get("hold_frames", 15)
     morph = config.get("morph_frames", 30)
     # Title card ~3s, each image gets hold frames, last gets 2x hold,
-    # morph transitions between pairs, 3s fade-to-black, 3s end title card
+    # morph transitions between pairs, 3s fade-to-black, 3s end title, 4s credit
     title_frames = 3 * fps
     image_frames = n * hold + hold + (n - 1) * morph
-    ending_frames = 3 * fps + 3 * fps  # fade-to-black + end title
+    ending_frames = 3 * fps + 3 * fps + 4 * fps  # fade-to-black + end title + credit
     total_frames = title_frames + image_frames + ending_frames
     return total_frames / fps
 
