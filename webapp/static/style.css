@@ -764,6 +764,7 @@ body {
     height: 100%;
     object-fit: contain;
     display: block;
+    transform: translateY(20px);
 }
 
 /* CSS vignette overlay for scrubber — matches Python render (face_scale=0.70) */
