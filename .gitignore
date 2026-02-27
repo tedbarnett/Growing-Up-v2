@@ -39,3 +39,4 @@ Code/selfie_segmenter.tflite
 
 # Config (contains local paths)
 config.json
+packaging/macos/icon.icns
