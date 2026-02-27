@@ -1,0 +1,41 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Media files (images, video, music)
+Images/
+aligned/
+frames/
+Output/
+mp3/
+subjects/
+
+# Generated data files
+manifest.json
+manifest_backup_*.json
+subjects.json
+failed_images.json
+job_status.json
+render_info.json
+
+# ML model files (large, download separately)
+Code/face_landmarker_v2_with_blendshapes.task
+Code/selfie_segmenter.tflite
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+
+# Config (contains local paths)
+config.json

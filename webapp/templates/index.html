@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Growing Up - Dashboard{% endblock %}
+
+{% block content %}
+<div class="subject-grid">
+    {% for s in subjects %}
+    <a href="{{ url_for('subject_detail', name=s.name) }}" class="subject-card">
+        <div class="card-header">
+            <h2>{{ s.name }}</h2>
+            {% if s.is_running %}
+                <span class="badge badge-running">Running</span>
+            {% elif s.job_state == 'complete' %}
+                <span class="badge badge-complete">Complete</span>
+            {% elif s.job_state == 'error' %}
+                <span class="badge badge-error">Error</span>
+            {% elif s.has_video %}
+                <span class="badge badge-complete">Video Ready</span>
+            {% else %}
+                <span class="badge badge-idle">Ready</span>
+            {% endif %}
+        </div>
+        <div class="card-stats">
+            {% if s.birthdate %}
+                <span>Born {{ s.birthdate }}</span>
+            {% endif %}
+            <span>{{ s.image_count }} photos</span>
+            <span>{{ s.aligned_count }} aligned</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+<div class="new-subject-section">
+    <h2>Add New Subject</h2>
+    <form action="{{ url_for('create_subject') }}" method="post" class="new-subject-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" required placeholder="e.g. Jane">
+            </div>
+            <div class="form-group">
+                <label for="birthdate">Birthdate</label>
+                <input type="date" id="birthdate" name="birthdate">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="images_folder">Images Folder</label>
+                <div class="input-with-browse">
+                    <input type="text" id="images_folder" name="images_folder"
+                           placeholder="Select or browse for a folder..."
+                           list="images_folder_list">
+                    <datalist id="images_folder_list">
+                        {% for folder in image_folders %}
+                        <option value="{{ folder }}">
+                        {% endfor %}
+                    </datalist>
+                    <button type="button" class="btn btn-secondary btn-browse"
+                            onclick="openBrowseModal('images_folder', 'dirs')">Browse</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="music">Music</label>
+                <div class="input-with-browse">
+                    <input type="text" id="music" name="music"
+                           placeholder="None (or browse for .mp3)..."
+                           list="music_list">
+                    <datalist id="music_list">
+                        {% for mp3 in mp3s %}
+                        <option value="{{ mp3 }}">
+                        {% endfor %}
+                    </datalist>
+                    <button type="button" class="btn btn-secondary btn-browse"
+                            onclick="openBrowseModal('music', 'files', '.mp3')">Browse</button>
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Subject</button>
+    </form>
+</div>
+{% endblock %}

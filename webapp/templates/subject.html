@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} - Growing Up{% endblock %}
+
+{% block content %}
+<div class="subject-header">
+    <h1>{{ name }}</h1>
+    <a href="{{ url_for('index') }}" class="back-link">&larr; Back</a>
+    {% if is_running %}
+        <span class="badge badge-running">Pipeline Running</span>
+    {% elif job_status and job_status.state == 'complete' %}
+        <span class="badge badge-complete">Complete</span>
+    {% elif job_status and job_status.state == 'error' %}
+        <span class="badge badge-error">Error</span>
+    {% endif %}
+</div>
+
+<div class="two-col">
+    <!-- Left column: Settings -->
+    <section class="settings-panel">
+        <h2>Settings</h2>
+        <form action="{{ url_for('edit_subject', name=name) }}" method="post" class="settings-form">
+            <div class="form-group">
+                <label for="birthdate">Birthdate</label>
+                <input type="date" id="birthdate" name="birthdate"
+                       value="{{ info.birthdate or '' }}">
+            </div>
+            <div class="form-group">
+                <label for="images_folder">Images Folder</label>
+                <div class="input-with-browse">
+                    <input type="text" id="images_folder" name="images_folder"
+                           value="{{ info.images_folder or '' }}"
+                           placeholder="Select or browse for a folder..."
+                           list="images_folder_list">
+                    <datalist id="images_folder_list">
+                        {% for folder in image_folders %}
+                        <option value="{{ folder }}">
+                        {% endfor %}
+                    </datalist>
+                    <button type="button" class="btn btn-secondary btn-browse"
+                            onclick="openBrowseModal('images_folder', 'dirs')">Browse</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="music">Music</label>
+                <div class="input-with-browse">
+                    <input type="text" id="music" name="music"
+                           value="{{ info.music or '' }}"
+                           placeholder="None (or browse for .mp3)..."
+                           list="music_list">
+                    <datalist id="music_list">
+                        {% for mp3 in mp3s %}
+                        <option value="{{ mp3 }}">
+                        {% endfor %}
+                    </datalist>
+                    <button type="button" class="btn btn-secondary btn-browse"
+                            onclick="openBrowseModal('music', 'files', '.mp3')">Browse</button>
+                </div>
+            </div>
+            <div class="form-group form-group-checkbox">
+                <label>
+                    <input type="checkbox" name="vignette" id="vignette"
+                           {% if info.vignette or config.vignette %}checked{% endif %}>
+                    Show vignette
+                </label>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-secondary">Save Settings</button>
+                <button type="button" id="delete-subject-btn" class="btn btn-danger" data-subject="{{ name }}">Delete Subject</button>
+            </div>
+        </form>
+
+        <div class="stats-block">
+            <div class="stat">
+                <span class="stat-value">{{ image_count }}</span>
+                <span class="stat-label">Source Photos</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">{{ aligned_count }}</span>
+                <span class="stat-label">Aligned Faces</span>
+            </div>
+        </div>
+        {% if video_duration or mp3_duration %}
+        <div class="stats-block">
+            {% if video_duration %}
+            <div class="stat">
+                <span class="stat-value">{{ '%d:%02d'|format(video_duration // 60, video_duration % 60) }}</span>
+                <span class="stat-label">Projected Video</span>
+            </div>
+            {% endif %}
+            {% if mp3_duration %}
+            <div class="stat">
+                <span class="stat-value">{{ '%d:%02d'|format(mp3_duration // 60, mp3_duration % 60) }}</span>
+                <span class="stat-label">Music Length</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Progress section (below settings) -->
+        <div id="progress-section" class="{{ '' if is_running else 'hidden' }}">
+            <div class="progress-header">
+                <span id="progress-step-label">
+                    {% if job_status %}{{ job_status.step_label }}{% endif %}
+                </span>
+                <span id="progress-step-count">
+                    {% if job_status %}
+                        Step {{ job_status.step_index + 1 }}/{{ job_status.total_steps }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="progress-bar-container">
+                <div id="progress-bar" class="progress-bar"
+                     style="width: {% if job_status and job_status.total_steps %}{{ ((job_status.step_index + 1) / job_status.total_steps * 100)|int }}%{% else %}0%{% endif %}">
+                </div>
+            </div>
+            <pre id="log-output" class="log-output">{% if job_status and job_status.log_tail %}{% for line in job_status.log_tail %}{{ line }}
+{% endfor %}{% endif %}</pre>
+        </div>
+
+        {% if job_status and job_status.state == 'error' %}
+        <div class="error-box">
+            <strong>Error:</strong> {{ job_status.error }}
+        </div>
+        {% endif %}
+    </section>
+
+    <!-- Right column: Pipeline + Scrubber + Video -->
+    <section class="video-panel">
+        <h2>Pipeline</h2>
+
+        <!-- Two-button layout -->
+        <div class="pipeline-buttons">
+            <button id="process-btn" class="btn btn-primary btn-large"
+                    data-subject="{{ name }}"
+                    {% if is_running %}disabled{% endif %}>
+                {% if is_running and job_status and job_status.phase == 'process' %}Processing...{% else %}Process Images{% endif %}
+            </button>
+            <button id="generate-btn" class="btn btn-primary btn-large"
+                    data-subject="{{ name }}"
+                    {% if not is_processed or is_running %}disabled{% endif %}>
+                {% if is_running and job_status and job_status.phase == 'generate' %}Generating...{% else %}Generate Video{% endif %}
+            </button>
+        </div>
+
+        <!-- Scrubber section (visible after processing) -->
+        <div id="scrubber-section" class="{{ '' if is_processed else 'hidden' }}">
+            <h2>Review Aligned Faces</h2>
+            <div class="scrubber-container">
+                <div class="scrubber-image-wrap{% if info.vignette or config.vignette %} vignette{% endif %}">
+                    <img id="scrubber-image" src="" alt="Aligned face">
+                    <button id="scrubber-delete-btn" class="btn btn-delete" title="Remove this image">X</button>
+                    <div id="scrubber-year-label" class="scrubber-year-label"></div>
+                </div>
+                <div class="scrubber-controls">
+                    <button id="scrubber-prev" class="btn btn-secondary btn-sm">Prev</button>
+                    <input type="range" id="scrubber-slider" min="0" max="0" value="0" step="1">
+                    <button id="scrubber-next" class="btn btn-secondary btn-sm">Next</button>
+                </div>
+                <div class="scrubber-info">
+                    <span id="scrubber-counter">0 / 0</span>
+                    <span id="scrubber-filename"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video section -->
+        <div id="video-section">
+            <div id="video-container">
+                {% if has_video %}
+                <h2>Video</h2>
+                <video id="video-player" controls preload="metadata">
+                    <source src="{{ url_for('serve_video', name=name) }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <a id="save-video-btn" class="btn btn-secondary btn-large"
+                   href="{{ url_for('serve_video', name=name) }}"
+                   download="Growing Up - {{ name }}.mp4">
+                    Save Video
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.SUBJECT_NAME = {{ name|tojson }};
+    window.SUBJECT_BIRTHDATE = {{ (info.birthdate or '')|tojson }};
+    window.IS_PROCESSED = {{ is_processed|tojson }};
+    {% if is_running %}
+    window.addEventListener('DOMContentLoaded', function() { startStatusStream(); });
+    {% elif is_processed %}
+    window.addEventListener('DOMContentLoaded', function() { loadScrubber(); });
+    {% endif %}
+</script>
+{% endblock %}
