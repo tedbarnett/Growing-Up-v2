@@ -8,34 +8,37 @@
 </head>
 <body>
     <nav class="navbar">
-        <a href="{{ url_for('index') }}" class="nav-brand">Growing Up: Local Server Version</a>
+        <a href="{{ url_for('index') }}" class="nav-brand">Growing Up</a>
+        {% block nav_right %}{% endblock %}
     </nav>
     <main class="container">
         {% block content %}{% endblock %}
     </main>
     <!-- Filesystem Browse Modal -->
     <div id="browse-modal" class="modal-overlay hidden">
-        <div class="modal">
+        <div class="modal browse-modal">
             <div class="modal-header">
-                <h3 id="browse-modal-title">Browse</h3>
+                <h3 id="browse-modal-title">Select a Folder</h3>
                 <button class="modal-close" onclick="closeBrowseModal()">&times;</button>
             </div>
-            <div class="modal-path-bar">
-                <button class="btn btn-secondary btn-sm" onclick="browseUp()">Up</button>
-                <input type="text" id="browse-path-input" class="browse-path-input"
-                       onkeydown="if(event.key==='Enter'){browseNavigate(this.value);}" />
+            <div class="browse-layout">
+                <aside class="browse-sidebar" id="browse-sidebar"></aside>
+                <div class="browse-main">
+                    <div class="browse-breadcrumbs" id="browse-breadcrumbs"></div>
+                    <div id="browse-items" class="browse-items"></div>
+                </div>
             </div>
-            <div id="browse-items" class="browse-items"></div>
             <div class="modal-footer">
                 <span id="browse-selected-label" class="browse-selected-label"></span>
                 <div>
                     <button class="btn btn-secondary" onclick="closeBrowseModal()">Cancel</button>
-                    <button id="browse-select-btn" class="btn btn-primary" onclick="browseConfirm()">Select This Folder</button>
+                    <button id="browse-select-btn" class="btn btn-primary" onclick="browseConfirm()">Select Folder</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <script>window.HOME_DIR = {{ home_dir|tojson }};</script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

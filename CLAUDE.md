@@ -65,8 +65,8 @@ Images/*.jpg → 00_convert → 01_detect → 02_align → 03_sort → [review] 
 - `webapp/app.py`: Flask routes for subject CRUD, two-phase pipeline launch, aligned image serving/deletion, video serving, SSE progress
 - `webapp/pipeline_runner.py`: Runs pipeline scripts as subprocesses in background threads, writes `job_status.json` for progress. Defines `PROCESS_STEPS` (00-03) and `GENERATE_STEPS` (04-05).
 - SSE endpoint (`/subjects/<name>/status`) streams progress to the browser
-- `webapp/static/app.js`: SSE consumption, progress bar, scrubber/flipbook (slider + arrow keys + delete), phase-aware UI updates, age label computation
-- `webapp/static/style.css`: Responsive layout, scrubber styling, vignette CSS overlay, dark theme elements
+- `webapp/static/app.js`: SSE consumption, progress bar, scrubber/flipbook (slider + arrow keys + delete), phase-aware UI updates, age label computation, Finder-style file browser, path basename display, settings change tracking
+- `webapp/static/style.css`: Professional pink theme, mobile-responsive layout, scrubber styling, vignette CSS overlay, Finder-style browse modal with sidebar + breadcrumbs, custom path tooltips
 
 ### Key Routes
 
@@ -106,6 +106,14 @@ Uses the tasks API (`mp.tasks.vision.FaceLandmarker`), NOT the deprecated `mp.so
 ### Age Label Computation
 
 Both Python (`04_render_morph.py:compute_age_label()`) and JavaScript (`app.js:computeAgeLabel()`) implementations exist for computing age from birthdate + photo date. The Python version renders into video frames; the JS version shows in the scrubber preview.
+
+### Video Duration Estimation
+
+Both Python (`app.py:get_projected_video_duration()`) and JavaScript (`app.js:updateScrubberDuration()`) compute estimated video length from aligned image count + config (fps, hold_frames, morph_frames). The JS version updates live in the scrubber title when images are deleted.
+
+### Settings Form Change Tracking
+
+The Save Settings button starts disabled/grey and turns blue only when a setting value differs from its initial state. Implemented via `app.js` settings form listener that captures initial values on page load.
 
 ## Tech Stack
 

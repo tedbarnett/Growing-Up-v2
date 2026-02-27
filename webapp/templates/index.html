@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Growing Up - Dashboard{% endblock %}
+{% block title %}Growing Up{% endblock %}
 
 {% block content %}
 <div class="subject-grid">
@@ -9,12 +9,12 @@
             <h2>{{ s.name }}</h2>
             {% if s.is_running %}
                 <span class="badge badge-running">Running</span>
-            {% elif s.job_state == 'complete' %}
-                <span class="badge badge-complete">Complete</span>
             {% elif s.job_state == 'error' %}
                 <span class="badge badge-error">Error</span>
             {% elif s.has_video %}
-                <span class="badge badge-complete">Video Ready</span>
+                <span class="badge badge-complete">Video Generated</span>
+            {% elif s.is_processed %}
+                <span class="badge badge-idle">Processed</span>
             {% else %}
                 <span class="badge badge-idle">Ready</span>
             {% endif %}

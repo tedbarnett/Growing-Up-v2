@@ -24,6 +24,12 @@ from pipeline_runner import (
 
 app = Flask(__name__)
 
+
+@app.context_processor
+def inject_globals():
+    return dict(home_dir=str(Path.home()))
+
+
 SUBJECTS_JSON = PROJECT_ROOT / "subjects.json"
 SUBJECTS_DIR = PROJECT_ROOT / "subjects"
 IMAGES_ROOT = PROJECT_ROOT / "Images"
@@ -279,6 +285,7 @@ def index():
         video = find_video(name)
         running = is_job_running(name)
         status = get_job_status(get_subject_dir(name))
+        subject_dir = get_subject_dir(name)
         subject_list.append({
             "name": name,
             "birthdate": info.get("birthdate", ""),
@@ -286,6 +293,7 @@ def index():
             "image_count": count_images(info.get("images_folder", "")),
             "aligned_count": count_aligned(name),
             "has_video": video is not None,
+            "is_processed": check_is_processed(subject_dir),
             "is_running": running,
             "job_state": status.get("state") if status else None,
         })

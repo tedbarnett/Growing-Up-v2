@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 {% block title %}{{ name }} - Growing Up{% endblock %}
 
+{% block nav_right %}
+<a href="{{ url_for('index') }}" class="nav-back-link">&larr; Back</a>
+{% endblock %}
+
 {% block content %}
 <div class="subject-header">
     <h1>{{ name }}</h1>
-    <a href="{{ url_for('index') }}" class="back-link">&larr; Back</a>
     {% if is_running %}
         <span class="badge badge-running">Pipeline Running</span>
-    {% elif job_status and job_status.state == 'complete' %}
-        <span class="badge badge-complete">Complete</span>
     {% elif job_status and job_status.state == 'error' %}
         <span class="badge badge-error">Error</span>
     {% endif %}
@@ -126,14 +127,12 @@
 
     <!-- Right column: Pipeline + Scrubber + Video -->
     <section class="video-panel">
-        <h2>Pipeline</h2>
-
         <!-- Two-button layout -->
         <div class="pipeline-buttons">
             <button id="process-btn" class="btn btn-primary btn-large"
                     data-subject="{{ name }}"
                     {% if is_running %}disabled{% endif %}>
-                {% if is_running and job_status and job_status.phase == 'process' %}Processing...{% else %}Process Images{% endif %}
+                {% if is_running and job_status and job_status.phase == 'process' %}Processing...{% elif is_processed %}Re-Process Images{% else %}Process Images{% endif %}
             </button>
             <button id="generate-btn" class="btn btn-primary btn-large"
                     data-subject="{{ name }}"
@@ -144,7 +143,7 @@
 
         <!-- Scrubber section (visible after processing) -->
         <div id="scrubber-section" class="{{ '' if is_processed else 'hidden' }}">
-            <h2>Review Aligned Faces</h2>
+            <h2>Review Faces <span id="scrubber-duration" class="scrubber-duration"></span></h2>
             <div class="scrubber-container">
                 <div class="scrubber-image-wrap{% if info.vignette or config.vignette %} vignette{% endif %}">
                     <img id="scrubber-image" src="" alt="Aligned face">
@@ -189,10 +188,27 @@
     window.SUBJECT_NAME = {{ name|tojson }};
     window.SUBJECT_BIRTHDATE = {{ (info.birthdate or '')|tojson }};
     window.IS_PROCESSED = {{ is_processed|tojson }};
+    window.PIPELINE_FPS = {{ config.get('fps', 30)|tojson }};
+    window.PIPELINE_HOLD = {{ config.get('hold_frames', 15)|tojson }};
+    window.PIPELINE_MORPH = {{ config.get('morph_frames', 30)|tojson }};
     {% if is_running %}
     window.addEventListener('DOMContentLoaded', function() { startStatusStream(); });
     {% elif is_processed %}
     window.addEventListener('DOMContentLoaded', function() { loadScrubber(); });
     {% endif %}
+
+    // Vignette checkbox toggles preview in real-time
+    document.addEventListener('DOMContentLoaded', function() {
+        var cb = document.getElementById('vignette');
+        if (cb) {
+            cb.addEventListener('change', function() {
+                var wrap = document.querySelector('.scrubber-image-wrap');
+                if (wrap) {
+                    if (this.checked) wrap.classList.add('vignette');
+                    else wrap.classList.remove('vignette');
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}

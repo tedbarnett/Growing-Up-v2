@@ -1,13 +1,13 @@
 /* Growing Up - Dashboard JS */
 
 // -----------------------------------------------------------------------
-// Filesystem Browse Modal
+// Filesystem Browse Modal (Finder-style)
 // -----------------------------------------------------------------------
 
 var _browseState = {
-    targetInputId: null,   // which <input> to populate
-    browseType: 'dirs',    // "dirs" or "files"
-    extFilter: '',         // e.g. ".mp3"
+    targetInputId: null,
+    browseType: 'dirs',
+    extFilter: '',
     currentPath: '',
     selectedPath: '',
 };
@@ -18,19 +18,19 @@ function openBrowseModal(inputId, browseType, extFilter) {
     _browseState.extFilter = extFilter || '';
     _browseState.selectedPath = '';
 
-    var title = browseType === 'files' ? 'Browse for File' : 'Browse for Folder';
+    var title = browseType === 'files' ? 'Select a File' : 'Select a Folder';
     document.getElementById('browse-modal-title').textContent = title;
 
     var selectBtn = document.getElementById('browse-select-btn');
-    selectBtn.textContent = browseType === 'files' ? 'Select File' : 'Select This Folder';
+    selectBtn.textContent = browseType === 'files' ? 'Select File' : 'Select Folder';
 
     document.getElementById('browse-modal').classList.remove('hidden');
 
-    // Start from current input value or home
+    populateSidebar();
+
     var currentVal = document.getElementById(inputId).value;
     var startPath = '';
     if (currentVal && currentVal.startsWith('/')) {
-        // For files, start in the parent directory
         if (browseType === 'files') {
             var lastSlash = currentVal.lastIndexOf('/');
             startPath = lastSlash > 0 ? currentVal.substring(0, lastSlash) : '/';
@@ -45,11 +45,105 @@ function closeBrowseModal() {
     document.getElementById('browse-modal').classList.add('hidden');
 }
 
+function populateSidebar() {
+    var sidebar = document.getElementById('browse-sidebar');
+    if (!sidebar) return;
+
+    var home = window.HOME_DIR || '';
+    if (!home) return;
+
+    var locations = [
+        { name: 'Home', path: home, icon: '\uD83C\uDFE0' },
+        { name: 'Desktop', path: home + '/Desktop', icon: '\uD83D\uDDA5' },
+        { name: 'Documents', path: home + '/Documents', icon: '\uD83D\uDCC4' },
+        { name: 'Pictures', path: home + '/Pictures', icon: '\uD83D\uDDBC' },
+        { name: 'Downloads', path: home + '/Downloads', icon: '\uD83D\uDCE5' },
+    ];
+
+    sidebar.innerHTML = '<div class="browse-sidebar-heading">Favorites</div>';
+    locations.forEach(function(loc) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'browse-sidebar-btn';
+        btn.setAttribute('data-path', loc.path);
+        btn.innerHTML = '<span class="sidebar-icon">' + loc.icon + '</span> ' + loc.name;
+        btn.onclick = function() { browseNavigate(loc.path); };
+        sidebar.appendChild(btn);
+    });
+}
+
+function renderBreadcrumbs(path) {
+    var container = document.getElementById('browse-breadcrumbs');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!path || path === '/') {
+        var span = document.createElement('span');
+        span.className = 'browse-crumb browse-crumb-current';
+        span.textContent = '/';
+        container.appendChild(span);
+        return;
+    }
+
+    var parts = path.split('/').filter(function(p) { return p !== ''; });
+
+    var rootBtn = document.createElement('button');
+    rootBtn.type = 'button';
+    rootBtn.className = 'browse-crumb browse-crumb-btn';
+    rootBtn.textContent = '/';
+    rootBtn.onclick = function() { browseNavigate('/'); };
+    container.appendChild(rootBtn);
+
+    parts.forEach(function(part, i) {
+        var sep = document.createElement('span');
+        sep.className = 'browse-crumb-sep';
+        sep.textContent = '\u203A';
+        container.appendChild(sep);
+
+        var partPath = '/' + parts.slice(0, i + 1).join('/');
+
+        if (i === parts.length - 1) {
+            var span = document.createElement('span');
+            span.className = 'browse-crumb browse-crumb-current';
+            span.textContent = part;
+            container.appendChild(span);
+        } else {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'browse-crumb browse-crumb-btn';
+            btn.textContent = part;
+            (function(p) {
+                btn.onclick = function() { browseNavigate(p); };
+            })(partPath);
+            container.appendChild(btn);
+        }
+    });
+}
+
+function updateSidebarActive(currentPath) {
+    var sidebar = document.getElementById('browse-sidebar');
+    if (!sidebar) return;
+    var btns = sidebar.querySelectorAll('.browse-sidebar-btn');
+    var bestMatch = -1;
+    var bestLen = 0;
+    btns.forEach(function(btn, i) {
+        var loc = btn.getAttribute('data-path');
+        if (loc && (currentPath === loc || currentPath.startsWith(loc + '/'))) {
+            if (loc.length > bestLen) {
+                bestMatch = i;
+                bestLen = loc.length;
+            }
+        }
+    });
+    btns.forEach(function(btn, i) {
+        btn.classList.toggle('active', i === bestMatch);
+    });
+}
+
 function browseNavigate(path) {
     var params = new URLSearchParams();
     if (path) params.set('path', path);
 
-    // For file browsing, we always list dirs to navigate, plus files to select
     if (_browseState.browseType === 'files') {
         params.set('type', 'all');
         if (_browseState.extFilter) params.set('ext', _browseState.extFilter);
@@ -61,7 +155,8 @@ function browseNavigate(path) {
         .then(function(r) { return r.json(); })
         .then(function(data) {
             _browseState.currentPath = data.current;
-            document.getElementById('browse-path-input').value = data.current;
+
+            renderBreadcrumbs(data.current);
 
             var container = document.getElementById('browse-items');
             container.innerHTML = '';
@@ -71,9 +166,7 @@ function browseNavigate(path) {
                 return;
             }
 
-            // For file browsing, show dirs and matching files
             if (_browseState.browseType === 'files') {
-                // Show directories first (for navigation)
                 var dirs = [];
                 var files = [];
                 data.items.forEach(function(item) {
@@ -84,7 +177,7 @@ function browseNavigate(path) {
                 dirs.forEach(function(item) {
                     var el = document.createElement('div');
                     el.className = 'browse-item browse-item-dir';
-                    el.textContent = item.name + '/';
+                    el.innerHTML = '<span class="browse-item-icon">\uD83D\uDCC1</span> ' + escapeHtml(item.name);
                     el.onclick = function() { browseNavigate(item.path); };
                     container.appendChild(el);
                 });
@@ -95,11 +188,10 @@ function browseNavigate(path) {
                     if (_browseState.selectedPath === item.path) {
                         el.className += ' browse-item-selected';
                     }
-                    el.textContent = item.name;
+                    el.innerHTML = '<span class="browse-item-icon">\uD83C\uDFB5</span> ' + escapeHtml(item.name);
                     el.onclick = function() {
                         _browseState.selectedPath = item.path;
                         document.getElementById('browse-selected-label').textContent = item.name;
-                        // Update selection highlighting
                         container.querySelectorAll('.browse-item-file').forEach(function(f) {
                             f.classList.remove('browse-item-selected');
                         });
@@ -108,34 +200,33 @@ function browseNavigate(path) {
                     container.appendChild(el);
                 });
             } else {
-                // Directory browsing — show subdirs to navigate into
                 data.items.forEach(function(item) {
                     var el = document.createElement('div');
                     el.className = 'browse-item browse-item-dir';
-                    el.textContent = item.name + '/';
+                    el.innerHTML = '<span class="browse-item-icon">\uD83D\uDCC1</span> ' + escapeHtml(item.name);
                     el.onclick = function() { browseNavigate(item.path); };
                     container.appendChild(el);
                 });
             }
 
             if (data.items.length === 0) {
-                container.innerHTML = '<div class="browse-empty">No items</div>';
+                container.innerHTML = '<div class="browse-empty">Empty folder</div>';
             }
 
-            // Update selected label for directory mode
             if (_browseState.browseType === 'dirs') {
-                document.getElementById('browse-selected-label').textContent = data.current;
+                var pathParts = data.current.split('/');
+                var folderName = pathParts[pathParts.length - 1] || '/';
+                document.getElementById('browse-selected-label').textContent = folderName;
             }
+
+            updateSidebarActive(data.current);
         });
 }
 
-function browseUp() {
-    var pathInput = document.getElementById('browse-path-input');
-    var current = pathInput.value || _browseState.currentPath;
-    // Go to parent
-    var lastSlash = current.lastIndexOf('/');
-    var parent = lastSlash > 0 ? current.substring(0, lastSlash) : '/';
-    browseNavigate(parent);
+function escapeHtml(text) {
+    var el = document.createElement('span');
+    el.textContent = text;
+    return el.innerHTML;
 }
 
 function browseConfirm() {
@@ -147,10 +238,135 @@ function browseConfirm() {
     }
 
     if (value && _browseState.targetInputId) {
-        document.getElementById(_browseState.targetInputId).value = value;
+        var input = document.getElementById(_browseState.targetInputId);
+        input.value = value;
+        // Trigger change event for path display + settings tracking
+        input.dispatchEvent(new Event('change', { bubbles: true }));
     }
     closeBrowseModal();
 }
+
+
+// -----------------------------------------------------------------------
+// Path Basename Display
+// -----------------------------------------------------------------------
+
+function getBasename(path) {
+    if (!path) return '';
+    var parts = path.replace(/\/+$/, '').split('/');
+    return parts[parts.length - 1] || path;
+}
+
+function updatePathDisplay(input) {
+    var display = input._pathDisplay;
+    if (!display) return;
+    var val = input.value.trim();
+    if (!val) {
+        display.style.display = 'none';
+        return;
+    }
+    // Show basename text; add custom tooltip span for full path
+    display.style.display = '';
+    var nameSpan = display.querySelector('.path-basename-text');
+    var tipSpan = display.querySelector('.path-tooltip');
+    if (!nameSpan) {
+        display.innerHTML = '';
+        nameSpan = document.createElement('span');
+        nameSpan.className = 'path-basename-text';
+        tipSpan = document.createElement('span');
+        tipSpan.className = 'path-tooltip';
+        display.appendChild(nameSpan);
+        display.appendChild(tipSpan);
+    }
+    nameSpan.textContent = getBasename(val);
+    tipSpan.textContent = val;
+}
+
+function initPathDisplays() {
+    document.querySelectorAll('.input-with-browse').forEach(function(wrapper) {
+        var input = wrapper.querySelector('input');
+        if (!input) return;
+
+        var display = document.createElement('div');
+        display.className = 'path-basename';
+        wrapper.parentNode.insertBefore(display, wrapper.nextSibling);
+        input._pathDisplay = display;
+
+        input.addEventListener('input', function() { updatePathDisplay(input); });
+        input.addEventListener('change', function() { updatePathDisplay(input); });
+        input.addEventListener('focus', function() {
+            display.classList.add('show-tooltip');
+            // Remove title to prevent native tooltip doubling
+            input.removeAttribute('title');
+        });
+        input.addEventListener('blur', function() {
+            setTimeout(function() { display.classList.remove('show-tooltip'); }, 150);
+        });
+        // Remove any list/datalist to prevent browser dropdown tooltip
+        if (input.hasAttribute('list')) {
+            var datalistId = input.getAttribute('list');
+            var datalist = document.getElementById(datalistId);
+            if (datalist) datalist.remove();
+            input.removeAttribute('list');
+        }
+        updatePathDisplay(input);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initPathDisplays);
+
+
+// -----------------------------------------------------------------------
+// Settings Form — disable Save until changes
+// -----------------------------------------------------------------------
+
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.settings-form');
+    if (!form) return;
+
+    var saveBtn = form.querySelector('button[type="submit"]');
+    if (!saveBtn) return;
+
+    // Capture initial values
+    var initialValues = {};
+    var fields = form.querySelectorAll('input, select');
+    fields.forEach(function(field) {
+        if (field.type === 'checkbox') {
+            initialValues[field.name] = field.checked;
+        } else {
+            initialValues[field.name] = field.value;
+        }
+    });
+
+    function checkForChanges() {
+        var hasChanges = false;
+        fields.forEach(function(field) {
+            if (!field.name) return;
+            if (field.type === 'checkbox') {
+                if (field.checked !== initialValues[field.name]) hasChanges = true;
+            } else {
+                if (field.value !== initialValues[field.name]) hasChanges = true;
+            }
+        });
+        saveBtn.disabled = !hasChanges;
+        if (hasChanges) {
+            saveBtn.classList.remove('btn-secondary');
+            saveBtn.classList.add('btn-primary');
+        } else {
+            saveBtn.classList.remove('btn-primary');
+            saveBtn.classList.add('btn-secondary');
+        }
+    }
+
+    // Start disabled
+    saveBtn.disabled = true;
+
+    // Listen for changes
+    fields.forEach(function(field) {
+        field.addEventListener('input', checkForChanges);
+        field.addEventListener('change', checkForChanges);
+    });
+});
 
 
 // -----------------------------------------------------------------------
@@ -287,23 +503,20 @@ function startStatusStream() {
             var phase = status.phase || 'full';
 
             if (phase === 'process') {
-                // Phase 1 done — show scrubber, enable generate
                 if (processBtn) {
-                    processBtn.textContent = 'Process Images';
+                    processBtn.textContent = 'Re-Process Images';
                     processBtn.disabled = false;
                 }
                 if (generateBtn) {
                     generateBtn.disabled = false;
                     generateBtn.textContent = 'Generate Video';
                 }
-                // Show scrubber
                 var scrubberSection = document.getElementById('scrubber-section');
                 if (scrubberSection) scrubberSection.classList.remove('hidden');
                 loadScrubber();
             } else if (phase === 'generate' || phase === 'full') {
-                // Phase 2 done — show video
                 if (processBtn) {
-                    processBtn.textContent = 'Process Images';
+                    processBtn.textContent = 'Re-Process Images';
                     processBtn.disabled = false;
                 }
                 if (generateBtn) {
@@ -317,7 +530,7 @@ function startStatusStream() {
         } else if (status.state === 'error') {
             source.close();
             if (processBtn) {
-                processBtn.textContent = 'Process Images';
+                processBtn.textContent = window.IS_PROCESSED ? 'Re-Process Images' : 'Process Images';
                 processBtn.disabled = false;
             }
             if (generateBtn) {
@@ -330,7 +543,7 @@ function startStatusStream() {
     source.onerror = function () {
         source.close();
         if (processBtn) {
-            processBtn.textContent = 'Process Images';
+            processBtn.textContent = window.IS_PROCESSED ? 'Re-Process Images' : 'Process Images';
             processBtn.disabled = false;
         }
         if (generateBtn) {
@@ -404,6 +617,23 @@ var _scrubberState = {
     preloadCache: {},
 };
 
+function updateScrubberDuration() {
+    var el = document.getElementById('scrubber-duration');
+    if (!el) return;
+    var n = _scrubberState.images.length;
+    if (n < 2) { el.textContent = ''; return; }
+    var fps = window.PIPELINE_FPS || 30;
+    var hold = window.PIPELINE_HOLD || 15;
+    var morph = window.PIPELINE_MORPH || 30;
+    var titleFrames = 3 * fps;
+    var imageFrames = n * hold + hold + (n - 1) * morph;
+    var endingFrames = 3 * fps + 3 * fps;
+    var totalSeconds = Math.round((titleFrames + imageFrames + endingFrames) / fps);
+    var mins = Math.floor(totalSeconds / 60);
+    var secs = totalSeconds % 60;
+    el.textContent = '(' + mins + ':' + (secs < 10 ? '0' : '') + secs + ' duration)';
+}
+
 function loadScrubber() {
     var subject = window.SUBJECT_NAME;
     if (!subject) return;
@@ -428,6 +658,7 @@ function loadScrubber() {
 
             showScrubberImage(0);
             preloadNearby(0);
+            updateScrubberDuration();
         });
 }
 
@@ -514,7 +745,6 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('keydown', function (e) {
         var scrubberSection = document.getElementById('scrubber-section');
         if (!scrubberSection || scrubberSection.classList.contains('hidden')) return;
-        // Don't capture arrows when typing in inputs
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
         if (e.key === 'ArrowLeft') {
@@ -549,7 +779,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         alert('Error: ' + data.error);
                         return;
                     }
-                    // Remove from scrubber state
                     delete _scrubberState.preloadCache[img.filename];
                     images.splice(_scrubberState.currentIndex, 1);
 
@@ -558,23 +787,18 @@ document.addEventListener('DOMContentLoaded', function () {
                         return;
                     }
 
-                    // Update slider max
                     var slider = document.getElementById('scrubber-slider');
                     if (slider) slider.max = images.length - 1;
 
-                    // Show next (or last) image
                     var newIndex = Math.min(_scrubberState.currentIndex, images.length - 1);
                     showScrubberImage(newIndex);
 
-                    // Update aligned count in stats
-                    var alignedStat = document.querySelector('.stat-value');
-                    if (alignedStat) {
-                        // Find the second stat (aligned faces)
-                        var stats = document.querySelectorAll('.stat-value');
-                        if (stats.length >= 2) {
-                            stats[1].textContent = images.length;
-                        }
+                    var stats = document.querySelectorAll('.stat-value');
+                    if (stats.length >= 2) {
+                        stats[1].textContent = images.length;
                     }
+
+                    updateScrubberDuration();
                 })
                 .catch(function (err) {
                     alert('Delete failed: ' + err);
