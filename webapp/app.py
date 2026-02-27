@@ -100,18 +100,55 @@ def find_video(name):
 
 
 def list_mp3s():
-    """List available MP3 files."""
-    if not MP3_DIR.exists():
-        return []
-    return sorted(f.name for f in MP3_DIR.iterdir()
-                  if f.is_file() and f.suffix.lower() == ".mp3")
+    """List available MP3 files: previously used paths from subjects + local mp3/ dir."""
+    mp3s = set()
+
+    # Collect previously used music paths from all subjects
+    subjects = load_subjects()
+    for info in subjects.values():
+        music = info.get("music", "")
+        if music:
+            mp3_path = Path(music)
+            if mp3_path.is_absolute() and mp3_path.exists():
+                mp3s.add(str(mp3_path))
+            elif MP3_DIR.exists():
+                local_path = MP3_DIR / music
+                if local_path.exists():
+                    mp3s.add(music)
+
+    # Add files from local mp3/ directory if it exists
+    if MP3_DIR.exists():
+        for f in MP3_DIR.iterdir():
+            if f.is_file() and f.suffix.lower() == ".mp3":
+                mp3s.add(f.name)
+
+    return sorted(mp3s)
 
 
 def list_image_folders():
-    """List subdirectories under Images/."""
-    if not IMAGES_ROOT.exists():
-        return []
-    return sorted(d.name for d in IMAGES_ROOT.iterdir() if d.is_dir())
+    """List image folders: previously used paths from subjects + local Images/ subdirs."""
+    folders = set()
+
+    # Collect previously used image paths from all subjects
+    subjects = load_subjects()
+    for info in subjects.values():
+        img_folder = info.get("images_folder", "")
+        if img_folder:
+            img_path = Path(img_folder)
+            if img_path.is_absolute() and img_path.is_dir():
+                folders.add(str(img_path))
+            elif IMAGES_ROOT.exists():
+                local_path = IMAGES_ROOT / img_folder
+                if local_path.is_dir():
+                    folders.add(img_folder)
+
+    # Add subdirectories from local Images/ if it exists
+    if IMAGES_ROOT.exists():
+        for d in IMAGES_ROOT.iterdir():
+            if d.is_dir():
+                folders.add(d.name)
+
+    return sorted(folders)
 
 
 def get_mp3_duration(music_ref):

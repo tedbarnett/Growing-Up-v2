@@ -25,8 +25,9 @@ The app includes both a **command-line pipeline** and a **web dashboard** for ma
 - **Music timing**: Background MP3 starts after the opening title fades out; music fades to silence over the last 3 seconds
 - **Multi-subject support**: Manage multiple people from the web dashboard, each with independent settings and data
 - **Delete & review**: Remove bad images from the scrubber; originals are moved to a `deleted/` folder (not permanently removed)
+- **Browse anywhere**: Images and music can live anywhere on your disk — just browse to them in the UI. Previously used locations are remembered across subjects.
 
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
@@ -37,31 +38,18 @@ The app includes both a **command-line pipeline** and a **web dashboard** for ma
 ### Setup
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+git clone https://github.com/tedbarnett/Growing-Up-v2.git
+cd Growing-Up-v2
+./setup.sh
 ```
 
-### Prepare Your Images
+The setup script will:
+- Verify Python 3.11+ and FFmpeg are installed
+- Create a virtual environment and install dependencies
+- Download the required ML model files (~15 MB)
+- Create the `subjects/` working directory
 
-Create a subfolder inside `Images/` named after your subject and copy their photos into it:
-
-```
-Images/
-  YourName/
-    1985 baby photo.jpg
-    1990 school picture.png
-    2005 wedding.jpg
-    2024 selfie.png
-    ...
-```
-
-- Photos can be JPG, JPEG, PNG, TIFF, HEIC, or BMP
-- Include the year in the filename for best chronological sorting (e.g. "1992 graduation.jpg")
-- Group photos are fine — the app identifies the correct person using face recognition
-- The more photos you include, the smoother the final video
-
-### Run via Web Dashboard (Recommended)
+### Run
 
 ```bash
 source venv/bin/activate
@@ -70,7 +58,7 @@ python webapp/app.py
 
 Open **http://localhost:5001** in your browser. From there you can:
 
-1. Create a subject and point it at your image folder
+1. Create a subject — use **Browse** to point at any folder of photos on your disk
 2. Click **"Process Images"** to run face detection, alignment, and sorting
 3. **Review aligned faces** in the scrubber — delete any bad ones
 4. Click **"Generate Video"** to render morphs and encode the final MP4
@@ -78,7 +66,34 @@ Open **http://localhost:5001** in your browser. From there you can:
 
 Or double-click `Start Server.command` to launch directly.
 
-### Run via Command Line
+### Prepare Your Images
+
+Your photos can live anywhere on your filesystem — just browse to the folder in the UI. For best results:
+
+- Include the year in the filename for chronological sorting (e.g. "1992 graduation.jpg")
+- Photos can be JPG, JPEG, PNG, TIFF, HEIC, or BMP
+- Group photos are fine — the app identifies the correct person using face recognition
+- The more photos you include, the smoother the final video
+
+### Manual Setup (Alternative)
+
+If you prefer to set up manually instead of using `setup.sh`:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Download ML models
+curl -L -o Code/face_landmarker_v2_with_blendshapes.task \
+    "https://storage.googleapis.com/mediapipe-assets/face_landmarker_v2_with_blendshapes.task"
+curl -L -o Code/selfie_segmenter.tflite \
+    "https://storage.googleapis.com/mediapipe-models/selfie_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+
+mkdir -p subjects
+```
+
+## Command-Line Pipeline
 
 ```bash
 source venv/bin/activate
@@ -92,7 +107,7 @@ python Code/01_detect_faces.py
 python Code/02_align_faces.py
 python Code/03_sort_images.py
 python Code/04_render_morph.py --crossfade --vignette
-python Code/05_encode_video.py --music mp3/song.mp3
+python Code/05_encode_video.py --music path/to/song.mp3
 ```
 
 The finished video will be saved to `Output/`.
@@ -119,12 +134,10 @@ webapp/            Flask web dashboard
   pipeline_runner.py  Background subprocess execution
   static/          CSS + JavaScript
   templates/       Jinja2 HTML templates
-Images/<Name>/     Source photos (user-provided)
-mp3/               Optional music tracks
-subjects/          Per-subject working data (auto-created by webapp)
+subjects/          Per-subject working data (auto-created)
 config.json        Pipeline settings (fps, morph duration, etc.)
-manifest.json      Auto-generated face detection data
 requirements.txt   Python dependencies
+setup.sh           One-command post-clone setup
 Start Server.command  macOS double-click launcher
 ```
 
