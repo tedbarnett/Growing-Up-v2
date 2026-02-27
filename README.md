@@ -22,7 +22,8 @@ The app includes both a **command-line pipeline** and a **web dashboard** for ma
 - **Age overlay**: Displays computed age ("Newborn", "3 months", "Age 5", etc.) on both the scrubber preview and the rendered video
 - **Vignette**: Optional oval vignette mask around the face (toggle on/off per subject)
 - **Title cards**: Opening title (subject name) with fade, ending title card with fade-in
-- **Music timing**: Background MP3 starts after the opening title fades out; music fades to silence over the last 3 seconds
+- **Multiple music tracks**: Add one or more MP3s per subject — they play back-to-back in the video. A single track loops; multiple tracks are concatenated.
+- **Music timing**: Background music starts after the opening title fades out; music fades to silence over the last 3 seconds
 - **Multi-subject support**: Manage multiple people from the web dashboard, each with independent settings and data
 - **Delete & review**: Remove bad images from the scrubber; originals are moved to a `deleted/` folder (not permanently removed)
 - **Browse anywhere**: Images and music can live anywhere on your disk — just browse to them in the UI. Previously used locations are remembered across subjects.
@@ -107,7 +108,7 @@ python Code/01_detect_faces.py
 python Code/02_align_faces.py
 python Code/03_sort_images.py
 python Code/04_render_morph.py --crossfade --vignette
-python Code/05_encode_video.py --music path/to/song.mp3
+python Code/05_encode_video.py --music song1.mp3 song2.mp3
 ```
 
 The finished video will be saved to `Output/`.
@@ -121,7 +122,7 @@ The finished video will be saved to `Output/`.
 | `--reference "photo.jpg"` | 01 | Specify reference photos for face recognition |
 | `--skip-detect` | run_all | Reuse existing face detection data |
 | `--debug-labels` | 04 | Show filename/date on morph frames |
-| `--music path.mp3` | 05 | Add background music (auto-timed with delays and fade-out) |
+| `--music path.mp3 [path2.mp3 ...]` | 05 | Add background music (single loops; multiple concatenated, auto-timed) |
 | `--face-scale 0.70` | 04 | Scale of face within vignette (smaller = more border) |
 | `--darken-bg` | 04 | Darken background behind face using selfie segmentation |
 

@@ -110,7 +110,7 @@ def is_processed(subject_dir):
         return False
 
 
-def _run_pipeline(subject_name, subject_dir, config, steps, phase_name, music_path=None):
+def _run_pipeline(subject_name, subject_dir, config, steps, phase_name, music_paths=None):
     """Run pipeline steps sequentially. Called in a background thread."""
     subject_dir = Path(subject_dir)
     steps = list(steps)
@@ -126,10 +126,10 @@ def _run_pipeline(subject_name, subject_dir, config, steps, phase_name, music_pa
                 **step,
                 "args": step.get("args", []) + ["--vignette"],
             })
-        elif step["script"] == "05_encode_video.py" and music_path:
+        elif step["script"] == "05_encode_video.py" and music_paths:
             new_steps.append({
                 **step,
-                "args": ["--music", str(music_path)],
+                "args": ["--music"] + [str(mp) for mp in music_paths],
             })
         else:
             new_steps.append(step)
@@ -246,14 +246,14 @@ def _run_pipeline(subject_name, subject_dir, config, steps, phase_name, music_pa
         _running_jobs.pop(subject_name, None)
 
 
-def _start_job(subject_name, subject_dir, config, steps, phase_name, music_path=None):
+def _start_job(subject_name, subject_dir, config, steps, phase_name, music_paths=None):
     """Launch a pipeline phase in a background thread. Returns True if started."""
     if is_job_running(subject_name):
         return False
 
     thread = threading.Thread(
         target=_run_pipeline,
-        args=(subject_name, subject_dir, config, steps, phase_name, music_path),
+        args=(subject_name, subject_dir, config, steps, phase_name, music_paths),
         daemon=True,
     )
 
@@ -269,11 +269,11 @@ def start_process(subject_name, subject_dir, config):
     return _start_job(subject_name, subject_dir, config, PROCESS_STEPS, "process")
 
 
-def start_generate(subject_name, subject_dir, config, music_path=None):
+def start_generate(subject_name, subject_dir, config, music_paths=None):
     """Launch Phase 2 (generate video: morph, encode)."""
-    return _start_job(subject_name, subject_dir, config, GENERATE_STEPS, "generate", music_path)
+    return _start_job(subject_name, subject_dir, config, GENERATE_STEPS, "generate", music_paths)
 
 
-def start_pipeline(subject_name, subject_dir, config, music_path=None):
+def start_pipeline(subject_name, subject_dir, config, music_paths=None):
     """Launch full pipeline (all steps). Kept for backward compatibility."""
-    return _start_job(subject_name, subject_dir, config, PIPELINE_STEPS, "full", music_path)
+    return _start_job(subject_name, subject_dir, config, PIPELINE_STEPS, "full", music_paths)

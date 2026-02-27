@@ -42,20 +42,23 @@
                 </div>
             </div>
             <div class="form-group">
-                <label for="music">Music</label>
-                <div class="input-with-browse">
-                    <input type="text" id="music" name="music"
-                           value="{{ info.music or '' }}"
-                           placeholder="None (or browse for .mp3)..."
-                           list="music_list">
-                    <datalist id="music_list">
-                        {% for mp3 in mp3s %}
-                        <option value="{{ mp3 }}">
-                        {% endfor %}
-                    </datalist>
-                    <button type="button" class="btn btn-secondary btn-browse"
-                            onclick="openBrowseModal('music', 'files', '.mp3')">Browse</button>
+                <label>Music</label>
+                <div id="music-list">
+                    {% for m in music_list %}
+                    <div class="music-row">
+                        <div class="input-with-browse">
+                            <input type="text" name="music" value="{{ m }}"
+                                   placeholder="None (or browse for .mp3)...">
+                            <button type="button" class="btn btn-secondary btn-browse"
+                                    onclick="openBrowseForMusic(this)">Browse</button>
+                            <button type="button" class="btn btn-danger btn-sm music-remove-btn"
+                                    onclick="removeMusicRow(this)"
+                                    {% if music_list|length <= 1 %}style="display:none"{% endif %}>&times;</button>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
+                <a href="#" id="add-music-btn" onclick="addMusicRow(); return false;" class="add-music-link">+ Add Music</a>
             </div>
             <div class="form-group form-group-checkbox">
                 <label>
@@ -77,7 +80,7 @@
             </div>
             <div class="stat">
                 <span class="stat-value">{{ aligned_count }}</span>
-                <span class="stat-label">Aligned Faces</span>
+                <span class="stat-label">Processed Images</span>
             </div>
         </div>
         {% if video_duration or mp3_duration %}
@@ -85,7 +88,7 @@
             {% if video_duration %}
             <div class="stat">
                 <span class="stat-value">{{ '%d:%02d'|format(video_duration // 60, video_duration % 60) }}</span>
-                <span class="stat-label">Projected Video</span>
+                <span class="stat-label">Video Length</span>
             </div>
             {% endif %}
             {% if mp3_duration %}
@@ -137,13 +140,13 @@
             <button id="generate-btn" class="btn btn-primary btn-large"
                     data-subject="{{ name }}"
                     {% if not is_processed or is_running %}disabled{% endif %}>
-                {% if is_running and job_status and job_status.phase == 'generate' %}Generating...{% else %}Generate Video{% endif %}
+                {% if is_running and job_status and job_status.phase == 'generate' %}Generating...{% elif has_video %}Re-Generate Video{% else %}Generate Video{% endif %}
             </button>
         </div>
 
         <!-- Scrubber section (visible after processing) -->
         <div id="scrubber-section" class="{{ '' if is_processed else 'hidden' }}">
-            <h2>Review Faces <span id="scrubber-duration" class="scrubber-duration"></span></h2>
+            <h2>Review Images <span id="scrubber-duration" class="scrubber-duration"></span></h2>
             <div class="scrubber-container">
                 <div class="scrubber-image-wrap{% if info.vignette or config.vignette %} vignette{% endif %}">
                     <img id="scrubber-image" src="" alt="Aligned face">
@@ -173,8 +176,8 @@
                 </video>
                 <a id="save-video-btn" class="btn btn-secondary btn-large"
                    href="{{ url_for('serve_video', name=name) }}"
-                   download="Growing Up - {{ name }}.mp4">
-                    Save Video
+                   download="{{ name }} - Growing Up.mp4">
+                    &#x2B07; Save Video
                 </a>
                 {% endif %}
             </div>
@@ -191,6 +194,7 @@
     window.PIPELINE_FPS = {{ config.get('fps', 30)|tojson }};
     window.PIPELINE_HOLD = {{ config.get('hold_frames', 15)|tojson }};
     window.PIPELINE_MORPH = {{ config.get('morph_frames', 30)|tojson }};
+    window.HAS_VIDEO = {{ has_video|tojson }};
     {% if is_running %}
     window.addEventListener('DOMContentLoaded', function() { startStatusStream(); });
     {% elif is_processed %}

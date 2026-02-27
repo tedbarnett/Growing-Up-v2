@@ -14,6 +14,7 @@ var _browseState = {
 
 function openBrowseModal(inputId, browseType, extFilter) {
     _browseState.targetInputId = inputId;
+    _browseState.targetElement = null;
     _browseState.browseType = browseType || 'dirs';
     _browseState.extFilter = extFilter || '';
     _browseState.selectedPath = '';
@@ -237,11 +238,14 @@ function browseConfirm() {
         value = _browseState.currentPath;
     }
 
-    if (value && _browseState.targetInputId) {
-        var input = document.getElementById(_browseState.targetInputId);
-        input.value = value;
-        // Trigger change event for path display + settings tracking
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+    if (value) {
+        var input = _browseState.targetElement ||
+                    (_browseState.targetInputId ? document.getElementById(_browseState.targetInputId) : null);
+        if (input) {
+            input.value = value;
+            // Trigger change event for path display + settings tracking
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
     closeBrowseModal();
 }
@@ -282,38 +286,101 @@ function updatePathDisplay(input) {
     tipSpan.textContent = val;
 }
 
+function initPathDisplayForWrapper(wrapper) {
+    var input = wrapper.querySelector('input');
+    if (!input || input._pathDisplay) return;
+
+    var display = document.createElement('div');
+    display.className = 'path-basename';
+    wrapper.parentNode.insertBefore(display, wrapper.nextSibling);
+    input._pathDisplay = display;
+
+    input.addEventListener('input', function() { updatePathDisplay(input); });
+    input.addEventListener('change', function() { updatePathDisplay(input); });
+    input.addEventListener('focus', function() {
+        display.classList.add('show-tooltip');
+        input.removeAttribute('title');
+    });
+    input.addEventListener('blur', function() {
+        setTimeout(function() { display.classList.remove('show-tooltip'); }, 150);
+    });
+    if (input.hasAttribute('list')) {
+        var datalistId = input.getAttribute('list');
+        var datalist = document.getElementById(datalistId);
+        if (datalist) datalist.remove();
+        input.removeAttribute('list');
+    }
+    updatePathDisplay(input);
+}
+
 function initPathDisplays() {
     document.querySelectorAll('.input-with-browse').forEach(function(wrapper) {
-        var input = wrapper.querySelector('input');
-        if (!input) return;
-
-        var display = document.createElement('div');
-        display.className = 'path-basename';
-        wrapper.parentNode.insertBefore(display, wrapper.nextSibling);
-        input._pathDisplay = display;
-
-        input.addEventListener('input', function() { updatePathDisplay(input); });
-        input.addEventListener('change', function() { updatePathDisplay(input); });
-        input.addEventListener('focus', function() {
-            display.classList.add('show-tooltip');
-            // Remove title to prevent native tooltip doubling
-            input.removeAttribute('title');
-        });
-        input.addEventListener('blur', function() {
-            setTimeout(function() { display.classList.remove('show-tooltip'); }, 150);
-        });
-        // Remove any list/datalist to prevent browser dropdown tooltip
-        if (input.hasAttribute('list')) {
-            var datalistId = input.getAttribute('list');
-            var datalist = document.getElementById(datalistId);
-            if (datalist) datalist.remove();
-            input.removeAttribute('list');
-        }
-        updatePathDisplay(input);
+        initPathDisplayForWrapper(wrapper);
     });
 }
 
 document.addEventListener('DOMContentLoaded', initPathDisplays);
+
+
+// -----------------------------------------------------------------------
+// Multi-Music Row Management
+// -----------------------------------------------------------------------
+
+function openBrowseForMusic(btn) {
+    var row = btn.closest('.music-row');
+    var input = row.querySelector('input[name="music"]');
+    _browseState.targetInputId = null;
+    _browseState.targetElement = input;
+    _browseState.browseType = 'files';
+    _browseState.extFilter = '.mp3';
+    _browseState.selectedPath = '';
+
+    document.getElementById('browse-modal-title').textContent = 'Select a File';
+    document.getElementById('browse-select-btn').textContent = 'Select File';
+    document.getElementById('browse-modal').classList.remove('hidden');
+
+    populateSidebar();
+
+    var currentVal = input.value;
+    var startPath = '';
+    if (currentVal && currentVal.startsWith('/')) {
+        var lastSlash = currentVal.lastIndexOf('/');
+        startPath = lastSlash > 0 ? currentVal.substring(0, lastSlash) : '/';
+    }
+    browseNavigate(startPath);
+}
+
+function addMusicRow() {
+    var list = document.getElementById('music-list');
+    if (!list) return;
+    var row = document.createElement('div');
+    row.className = 'music-row';
+    row.innerHTML =
+        '<div class="input-with-browse">' +
+        '<input type="text" name="music" value="" placeholder="None (or browse for .mp3)...">' +
+        '<button type="button" class="btn btn-secondary btn-browse" onclick="openBrowseForMusic(this)">Browse</button>' +
+        '<button type="button" class="btn btn-danger btn-sm music-remove-btn" onclick="removeMusicRow(this)">\u00d7</button>' +
+        '</div>';
+    list.appendChild(row);
+    updateMusicRemoveButtons();
+    initPathDisplayForWrapper(row.querySelector('.input-with-browse'));
+    if (window._checkForChanges) window._checkForChanges();
+}
+
+function removeMusicRow(btn) {
+    var row = btn.closest('.music-row');
+    if (row) row.remove();
+    updateMusicRemoveButtons();
+    if (window._checkForChanges) window._checkForChanges();
+}
+
+function updateMusicRemoveButtons() {
+    var rows = document.querySelectorAll('#music-list .music-row');
+    var removeBtns = document.querySelectorAll('#music-list .music-remove-btn');
+    removeBtns.forEach(function(btn) {
+        btn.style.display = rows.length > 1 ? '' : 'none';
+    });
+}
 
 
 // -----------------------------------------------------------------------
@@ -327,10 +394,9 @@ document.addEventListener('DOMContentLoaded', function() {
     var saveBtn = form.querySelector('button[type="submit"]');
     if (!saveBtn) return;
 
-    // Capture initial values
+    // Capture initial values (non-music fields)
     var initialValues = {};
-    var fields = form.querySelectorAll('input, select');
-    fields.forEach(function(field) {
+    form.querySelectorAll('input:not([name="music"]), select').forEach(function(field) {
         if (field.type === 'checkbox') {
             initialValues[field.name] = field.checked;
         } else {
@@ -338,9 +404,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Capture initial music values
+    var initialMusicValues = [];
+    form.querySelectorAll('input[name="music"]').forEach(function(input) {
+        initialMusicValues.push(input.value);
+    });
+
     function checkForChanges() {
         var hasChanges = false;
-        fields.forEach(function(field) {
+        form.querySelectorAll('input:not([name="music"]), select').forEach(function(field) {
             if (!field.name) return;
             if (field.type === 'checkbox') {
                 if (field.checked !== initialValues[field.name]) hasChanges = true;
@@ -348,6 +420,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (field.value !== initialValues[field.name]) hasChanges = true;
             }
         });
+        // Check music fields (count and values may have changed)
+        var currentMusic = [];
+        form.querySelectorAll('input[name="music"]').forEach(function(input) {
+            currentMusic.push(input.value);
+        });
+        if (JSON.stringify(currentMusic) !== JSON.stringify(initialMusicValues)) hasChanges = true;
+
         saveBtn.disabled = !hasChanges;
         if (hasChanges) {
             saveBtn.classList.remove('btn-secondary');
@@ -361,11 +440,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Start disabled
     saveBtn.disabled = true;
 
-    // Listen for changes
-    fields.forEach(function(field) {
-        field.addEventListener('input', checkForChanges);
-        field.addEventListener('change', checkForChanges);
-    });
+    // Use event delegation on the form to catch dynamic inputs
+    form.addEventListener('input', checkForChanges);
+    form.addEventListener('change', checkForChanges);
+
+    // Expose for use by addMusicRow/removeMusicRow
+    window._checkForChanges = checkForChanges;
 });
 
 
@@ -450,7 +530,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     startStatusStream();
                 })
                 .catch(function (err) {
-                    generateBtn.textContent = 'Generate Video';
+                    generateBtn.textContent = window.HAS_VIDEO ? 'Re-Generate Video' : 'Generate Video';
                     generateBtn.disabled = false;
                     console.error(err);
                 });
@@ -498,6 +578,14 @@ function startStatusStream() {
             logOutput.scrollTop = logOutput.scrollHeight;
         }
 
+        // Update aligned/processed count live
+        if (data.aligned_count !== undefined) {
+            var stats = document.querySelectorAll('.stat-value');
+            if (stats.length >= 2) {
+                stats[1].textContent = data.aligned_count;
+            }
+        }
+
         if (status.state === 'complete') {
             source.close();
             var phase = status.phase || 'full';
@@ -509,7 +597,7 @@ function startStatusStream() {
                 }
                 if (generateBtn) {
                     generateBtn.disabled = false;
-                    generateBtn.textContent = 'Generate Video';
+                    generateBtn.textContent = data.has_video ? 'Re-Generate Video' : 'Generate Video';
                 }
                 var scrubberSection = document.getElementById('scrubber-section');
                 if (scrubberSection) scrubberSection.classList.remove('hidden');
@@ -520,9 +608,10 @@ function startStatusStream() {
                     processBtn.disabled = false;
                 }
                 if (generateBtn) {
-                    generateBtn.textContent = 'Generate Video';
+                    generateBtn.textContent = 'Re-Generate Video';
                     generateBtn.disabled = false;
                 }
+                window.HAS_VIDEO = true;
                 if (data.has_video) {
                     showVideoPlayer();
                 }
@@ -534,8 +623,8 @@ function startStatusStream() {
                 processBtn.disabled = false;
             }
             if (generateBtn) {
-                generateBtn.textContent = 'Generate Video';
-                generateBtn.disabled = data.is_processed ? false : true;
+                generateBtn.textContent = (data.has_video || window.HAS_VIDEO) ? 'Re-Generate Video' : 'Generate Video';
+                generateBtn.disabled = !data.is_processed;
             }
         }
     };
@@ -569,8 +658,8 @@ function showVideoPlayer() {
             '</video>' +
             '<a id="save-video-btn" class="btn btn-secondary btn-large" ' +
             'href="/subjects/' + encodeURIComponent(subject) + '/video" ' +
-            'download="Growing Up - ' + subject + '.mp4">' +
-            'Save Video</a>';
+            'download="' + subject + ' - Growing Up.mp4">' +
+            '\u2B07 Save Video</a>';
     }
 }
 

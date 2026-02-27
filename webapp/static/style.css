@@ -96,6 +96,9 @@ body {
     text-decoration: none;
     color: var(--text);
     transition: box-shadow 0.2s, transform 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .subject-card:hover {
@@ -103,16 +106,37 @@ body {
     transform: translateY(-2px);
 }
 
+.card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.card-thumbnail {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #000;
+}
+
+.card-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
 .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 .card-header h2 {
     font-size: 1.3rem;
     font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .card-stats {
@@ -779,8 +803,15 @@ body {
     transition: opacity 0.2s;
 }
 
+/* Show on hover (desktop) or on touch devices that lack hover */
 .scrubber-image-wrap:hover .btn-delete {
     opacity: 1;
+}
+
+@media (hover: none) {
+    .btn-delete {
+        opacity: 0.85;
+    }
 }
 
 .btn-delete:hover {
@@ -789,7 +820,7 @@ body {
 
 .scrubber-year-label {
     position: absolute;
-    bottom: 1.5rem;
+    bottom: 1.8rem;
     left: 0;
     right: 0;
     text-align: center;
@@ -902,6 +933,29 @@ body {
     opacity: 1;
 }
 
+/* Music rows */
+.music-row {
+    margin-bottom: 0.4rem;
+}
+
+.music-remove-btn {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.add-music-link {
+    display: inline-block;
+    margin-top: 0.3rem;
+    font-size: 0.85rem;
+    color: #3b82f6;
+    text-decoration: none;
+}
+
+.add-music-link:hover {
+    text-decoration: underline;
+}
+
 .hidden {
     display: none;
 }
@@ -972,6 +1026,10 @@ body {
 
     .subject-header h1 {
         font-size: 1.5rem;
+    }
+
+    input[type="date"] {
+        width: 50%;
     }
 
     .scrubber-image-wrap {

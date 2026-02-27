@@ -58,14 +58,14 @@ Images/*.jpg → 00_convert → 01_detect → 02_align → 03_sort → [review] 
 - **02_align_faces.py**: Single-pass affine transform (rotation + scale + translation) placing eyes at fixed coordinates. Outputs 1024×1024 PNGs to `aligned/`.
 - **03_sort_images.py**: Orders images chronologically by extracted date (filename or EXIF). Writes `__sequence__` to manifest.
 - **04_render_morph.py**: Two modes — `--crossfade` (alpha blend) or default Delaunay triangulation morphing. Renders opening/ending title cards, age labels, optional vignette. Writes `render_info.json` with timing data for the encoder.
-- **05_encode_video.py**: FFmpeg H.264 encoding (CRF 18, slow preset, yuv420p). Handles music delay (starts after title card), audio fade-out over last 3 seconds.
+- **05_encode_video.py**: FFmpeg H.264 encoding (CRF 18, slow preset, yuv420p). Accepts multiple `--music` files: single file loops, multiple files are concatenated via FFmpeg concat filter. Handles music delay (starts after title card), audio fade-out over last 3 seconds.
 
 ### Web App Architecture
 
 - `webapp/app.py`: Flask routes for subject CRUD, two-phase pipeline launch, aligned image serving/deletion, video serving, SSE progress
 - `webapp/pipeline_runner.py`: Runs pipeline scripts as subprocesses in background threads, writes `job_status.json` for progress. Defines `PROCESS_STEPS` (00-03) and `GENERATE_STEPS` (04-05).
 - SSE endpoint (`/subjects/<name>/status`) streams progress to the browser
-- `webapp/static/app.js`: SSE consumption, progress bar, scrubber/flipbook (slider + arrow keys + delete), phase-aware UI updates, age label computation, Finder-style file browser, path basename display, settings change tracking
+- `webapp/static/app.js`: SSE consumption, progress bar, scrubber/flipbook (slider + arrow keys + delete), phase-aware UI updates, age label computation, Finder-style file browser, path basename display, settings change tracking, dynamic multi-music row management
 - `webapp/static/style.css`: Professional pink theme, mobile-responsive layout, scrubber styling, vignette CSS overlay, Finder-style browse modal with sidebar + breadcrumbs, custom path tooltips
 
 ### Key Routes
@@ -80,7 +80,7 @@ Images/*.jpg → 00_convert → 01_detect → 02_align → 03_sort → [review] 
 
 ### Multi-Subject System
 
-Each subject gets `subjects/<name>/` with its own config.json, manifest.json, and working directories (aligned, frames, output). The webapp manages subjects via `subjects.json` registry. Environment variables (`GROWUP_*`) isolate paths per subject when pipeline runs via webapp.
+Each subject gets `subjects/<name>/` with its own config.json, manifest.json, and working directories (aligned, frames, output). The webapp manages subjects via `subjects.json` registry. Environment variables (`GROWUP_*`) isolate paths per subject when pipeline runs via webapp. The `"music"` field in subjects.json is a list of paths (backward-compatible: legacy string values are treated as single-element lists via `get_music_list()`).
 
 ### Key Data Files
 
@@ -113,7 +113,14 @@ Both Python (`app.py:get_projected_video_duration()`) and JavaScript (`app.js:up
 
 ### Settings Form Change Tracking
 
-The Save Settings button starts disabled/grey and turns blue only when a setting value differs from its initial state. Implemented via `app.js` settings form listener that captures initial values on page load.
+The Save Settings button starts disabled/grey and turns blue only when a setting value differs from its initial state. Implemented via `app.js` settings form listener that captures initial values on page load. Uses event delegation on the form to handle dynamically added music input rows.
+
+### Multi-Music Support
+
+Music is stored as a JSON list in `subjects.json`. Key helpers in `app.py`:
+- `get_music_list(info)`: Returns music as a list (handles legacy string format)
+- `resolve_music_paths(info)`: Resolves to list of absolute file paths
+The encoder (`05_encode_video.py`) accepts `--music` with `nargs="*"`: single file loops via `-stream_loop -1`; multiple files use FFmpeg `concat` filter to join audio before applying delay and fade-out.
 
 ## Tech Stack
 

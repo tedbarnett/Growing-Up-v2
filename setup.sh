@@ -82,7 +82,7 @@ if [ -f "$MODEL_DIR/selfie_segmenter.tflite" ]; then
 else
     echo "Downloading selfie segmenter model..."
     curl -L -o "$MODEL_DIR/selfie_segmenter.tflite" \
-        "https://storage.googleapis.com/mediapipe-models/selfie_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+        "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
     echo "[OK] Selfie segmenter model downloaded"
 fi
 

@@ -25,7 +25,7 @@ def count_frames():
     return len(frames)
 
 
-def encode_video(config, output_name="growing_up_ted.mp4", music_path=None,
+def encode_video(config, output_name="growing_up_ted.mp4", music_paths=None,
                  crf=18, preset="slow"):
     """
     Encode frames to MP4 using FFmpeg.
@@ -33,7 +33,7 @@ def encode_video(config, output_name="growing_up_ted.mp4", music_path=None,
     Parameters:
         config: config dict
         output_name: output filename
-        music_path: optional path to music file
+        music_paths: optional list of paths to music file(s)
         crf: constant rate factor (lower = better quality, 18 is visually lossless)
         preset: encoding speed/quality tradeoff
     """
@@ -50,6 +50,10 @@ def encode_video(config, output_name="growing_up_ted.mp4", music_path=None,
 
     duration = frame_count / fps
     print(f"Encoding {frame_count} frames at {fps}fps ({duration:.1f}s)...")
+
+    # Normalize music_paths
+    if not music_paths:
+        music_paths = []
 
     # Read render timing info (written by 04_render_morph.py)
     render_info_path = FRAMES_DIR / "render_info.json"
@@ -72,8 +76,13 @@ def encode_video(config, output_name="growing_up_ted.mp4", music_path=None,
         "-i", input_pattern,
     ]
 
-    if music_path:
-        cmd.extend(["-stream_loop", "-1", "-i", str(music_path)])
+    if len(music_paths) == 1:
+        # Single music file: loop to fill video duration
+        cmd.extend(["-stream_loop", "-1", "-i", str(music_paths[0])])
+    elif len(music_paths) > 1:
+        # Multiple music files: add each as a separate input
+        for mp in music_paths:
+            cmd.extend(["-i", str(mp)])
 
     cmd.extend([
         "-c:v", "libx264",
@@ -83,10 +92,8 @@ def encode_video(config, output_name="growing_up_ted.mp4", music_path=None,
         "-movflags", "+faststart",  # Web-optimized
     ])
 
-    if music_path:
-        # Build audio filter chain:
-        #   1. Delay music start until after opening title card
-        #   2. Fade music to silence over last 3 seconds of video
+    if len(music_paths) == 1:
+        # Single file: simple audio filter chain
         audio_filters = []
         if music_delay_s > 0:
             delay_ms = int(music_delay_s * 1000)
@@ -99,6 +106,28 @@ def encode_video(config, output_name="growing_up_ted.mp4", music_path=None,
             "-c:a", "aac",
             "-b:a", "192k",
             "-shortest",  # End when shortest stream ends
+        ])
+    elif len(music_paths) > 1:
+        # Multiple files: concat audio inputs, then apply delay + fade
+        n = len(music_paths)
+        concat_inputs = "".join(f"[{i+1}:a]" for i in range(n))
+        filter_parts = [f"{concat_inputs}concat=n={n}:v=0:a=1[acat]"]
+
+        delay_fade = []
+        if music_delay_s > 0:
+            delay_ms = int(music_delay_s * 1000)
+            delay_fade.append(f"adelay={delay_ms}|{delay_ms}")
+        fade_out_start = max(0, duration - 3.0)
+        delay_fade.append(f"afade=t=out:st={fade_out_start:.2f}:d=3")
+
+        filter_parts.append(f"[acat]{','.join(delay_fade)}[aout]")
+
+        cmd.extend([
+            "-filter_complex", ";".join(filter_parts),
+            "-map", "0:v", "-map", "[aout]",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-shortest",
         ])
 
     cmd.append(str(output_path))
@@ -211,8 +240,8 @@ def add_year_overlay(config, manifest):
 def main():
     parser = argparse.ArgumentParser(description="Encode video from frames")
     parser.add_argument("--fps", type=int, default=None, help="Frame rate")
-    parser.add_argument("--music", type=str, default=None,
-                        help="Path to background music file")
+    parser.add_argument("--music", type=str, nargs="*", default=None,
+                        help="Path(s) to background music file(s)")
     parser.add_argument("--crf", type=int, default=18,
                         help="Quality (0-51, lower=better, default=18)")
     parser.add_argument("--preset", default="slow",
@@ -229,10 +258,11 @@ def main():
         config["fps"] = args.fps
 
     # Encode base video
+    music_paths = args.music if args.music else None
     output_path = encode_video(
         config,
         output_name=args.output,
-        music_path=args.music,
+        music_paths=music_paths,
         crf=args.crf,
         preset=args.preset
     )

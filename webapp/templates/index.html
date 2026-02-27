@@ -5,27 +5,35 @@
 <div class="subject-grid">
     {% for s in subjects %}
     <a href="{{ url_for('subject_detail', name=s.name) }}" class="subject-card">
-        <div class="card-header">
-            <h2>{{ s.name }}</h2>
-            {% if s.is_running %}
-                <span class="badge badge-running">Running</span>
-            {% elif s.job_state == 'error' %}
-                <span class="badge badge-error">Error</span>
-            {% elif s.has_video %}
-                <span class="badge badge-complete">Video Generated</span>
-            {% elif s.is_processed %}
-                <span class="badge badge-idle">Processed</span>
-            {% else %}
-                <span class="badge badge-idle">Ready</span>
-            {% endif %}
+        <div class="card-body">
+            <div class="card-header">
+                <h2>{{ s.name }}
+                    {% if s.is_running %}
+                        <span class="badge badge-running">Running</span>
+                    {% elif s.job_state == 'error' %}
+                        <span class="badge badge-error">Error</span>
+                    {% elif s.has_video %}
+                        <span class="badge badge-complete">Video Generated</span>
+                    {% elif s.is_processed %}
+                        <span class="badge badge-idle">Processed</span>
+                    {% elif s.image_count > 0 %}
+                        <span class="badge badge-idle">Ready</span>
+                    {% endif %}
+                </h2>
+            </div>
+            <div class="card-stats">
+                {% if s.birthdate %}
+                    <span>Born {{ s.birthdate }}</span>
+                {% endif %}
+                <span>{{ s.image_count }} photos</span>
+                <span>{{ s.aligned_count }} processed</span>
+            </div>
         </div>
-        <div class="card-stats">
-            {% if s.birthdate %}
-                <span>Born {{ s.birthdate }}</span>
-            {% endif %}
-            <span>{{ s.image_count }} photos</span>
-            <span>{{ s.aligned_count }} aligned</span>
+        {% if s.last_face %}
+        <div class="card-thumbnail">
+            <img src="{{ url_for('serve_aligned', name=s.name, filename=s.last_face) }}" alt="">
         </div>
+        {% endif %}
     </a>
     {% endfor %}
 </div>

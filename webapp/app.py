@@ -96,6 +96,26 @@ def count_aligned(name):
                if f.is_file() and f.suffix.lower() == ".png")
 
 
+def last_aligned_filename(name):
+    """Return filename of the last face in the aligned sequence, or None."""
+    subject_dir = get_subject_dir(name)
+    manifest_path = subject_dir / "manifest.json"
+    if not manifest_path.exists():
+        return None
+    try:
+        with open(manifest_path, "r") as f:
+            manifest = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
+    seq = manifest.get("__sequence__", [])
+    aligned_dir = subject_dir / "aligned"
+    # Walk backwards to find the last image that actually exists
+    for fname in reversed(seq):
+        if (aligned_dir / fname).exists():
+            return fname
+    return None
+
+
 def find_video(name):
     """Find the most recent MP4 in the subject's output dir."""
     output_dir = get_subject_dir(name) / "output"
@@ -112,8 +132,9 @@ def list_mp3s():
     # Collect previously used music paths from all subjects
     subjects = load_subjects()
     for info in subjects.values():
-        music = info.get("music", "")
-        if music:
+        for music in get_music_list(info):
+            if not music:
+                continue
             mp3_path = Path(music)
             if mp3_path.is_absolute() and mp3_path.exists():
                 mp3s.add(str(mp3_path))
@@ -155,6 +176,30 @@ def list_image_folders():
                 folders.add(d.name)
 
     return sorted(folders)
+
+
+def get_music_list(info):
+    """Get music as a list, handling backward compat from string."""
+    music = info.get("music", "")
+    if isinstance(music, list):
+        return music if music else []
+    return [music] if music else []
+
+
+def resolve_music_paths(info):
+    """Resolve music paths from subject info, returning list of absolute path strings."""
+    paths = []
+    for m in get_music_list(info):
+        if not m:
+            continue
+        mp3_path = Path(m)
+        if mp3_path.is_absolute() and mp3_path.exists():
+            paths.append(str(mp3_path))
+        else:
+            mp3_path = MP3_DIR / m
+            if mp3_path.exists():
+                paths.append(str(mp3_path))
+    return paths
 
 
 def get_mp3_duration(music_ref):
@@ -296,6 +341,7 @@ def index():
             "is_processed": check_is_processed(subject_dir),
             "is_running": running,
             "job_state": status.get("state") if status else None,
+            "last_face": last_aligned_filename(name),
         })
     return render_template("index.html",
                            subjects=subject_list,
@@ -316,7 +362,8 @@ def create_subject():
 
     birthdate = request.form.get("birthdate", "")
     images_folder = request.form.get("images_folder", name)
-    music = request.form.get("music", "")
+    music_raw = request.form.get("music", "")
+    music = [music_raw] if music_raw else []
 
     # Create subject directory and subdirs
     subject_dir = get_subject_dir(name)
@@ -376,8 +423,19 @@ def subject_detail(name):
     subject_dir = get_subject_dir(name)
     processed = check_is_processed(subject_dir)
 
-    mp3_duration = get_mp3_duration(info.get("music", ""))
+    # Sum durations of all music files
+    music_paths = resolve_music_paths(info)
+    mp3_duration = None
+    if music_paths:
+        total = 0
+        for mp in music_paths:
+            d = get_mp3_duration(mp)
+            if d:
+                total += d
+        mp3_duration = total if total > 0 else None
+
     video_duration = get_projected_video_duration(name)
+    music_list = get_music_list(info) or [""]
 
     return render_template("subject.html",
                            name=name,
@@ -393,7 +451,8 @@ def subject_detail(name):
                            image_folders=list_image_folders(),
                            mp3s=list_mp3s(),
                            mp3_duration=mp3_duration,
-                           video_duration=video_duration)
+                           video_duration=video_duration,
+                           music_list=music_list)
 
 
 @app.route("/subjects/<name>/edit", methods=["POST"])
@@ -405,12 +464,12 @@ def edit_subject(name):
 
     birthdate = request.form.get("birthdate", "")
     images_folder = request.form.get("images_folder", "")
-    music = request.form.get("music", "")
+    music_list = [m for m in request.form.getlist("music") if m.strip()]
     vignette = request.form.get("vignette") == "on"
 
     subjects[name]["birthdate"] = birthdate
     subjects[name]["images_folder"] = images_folder
-    subjects[name]["music"] = music
+    subjects[name]["music"] = music_list
     subjects[name]["vignette"] = vignette
     save_subjects(subjects)
 
@@ -467,19 +526,10 @@ def make_video(name):
         if not p.exists() and not p.is_symlink():
             p.mkdir(exist_ok=True)
 
-    # Music — support absolute paths or filenames in mp3/
-    music = subjects[name].get("music", "")
-    music_path = None
-    if music:
-        mp3_path = Path(music)
-        if mp3_path.is_absolute() and mp3_path.exists():
-            music_path = str(mp3_path)
-        else:
-            mp3_path = MP3_DIR / music
-            if mp3_path.exists():
-                music_path = str(mp3_path)
+    # Music — resolve all paths
+    music_paths = resolve_music_paths(subjects[name])
 
-    started = start_pipeline(name, str(subject_dir), config, music_path)
+    started = start_pipeline(name, str(subject_dir), config, music_paths or None)
     if started:
         return jsonify({"status": "started"})
     else:
@@ -532,19 +582,10 @@ def generate_video(name):
         if not p.exists() and not p.is_symlink():
             p.mkdir(exist_ok=True)
 
-    # Music
-    music = subjects[name].get("music", "")
-    music_path = None
-    if music:
-        mp3_path = Path(music)
-        if mp3_path.is_absolute() and mp3_path.exists():
-            music_path = str(mp3_path)
-        else:
-            mp3_path = MP3_DIR / music
-            if mp3_path.exists():
-                music_path = str(mp3_path)
+    # Music — resolve all paths
+    music_paths = resolve_music_paths(subjects[name])
 
-    started = start_generate(name, str(subject_dir), config, music_path)
+    started = start_generate(name, str(subject_dir), config, music_paths or None)
     if started:
         return jsonify({"status": "started", "phase": "generate"})
     else:
@@ -671,6 +712,7 @@ def subject_status(name):
                 "is_running": running,
                 "has_video": find_video(name) is not None,
                 "is_processed": check_is_processed(subject_dir),
+                "aligned_count": count_aligned(name),
             })
 
             if data != last_data:
