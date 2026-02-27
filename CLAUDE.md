@@ -57,8 +57,8 @@ Images/*.jpg → 00_convert → 01_detect → 02_align → 03_sort → [review] 
 - **01_detect_faces.py**: Uses insightface (buffalo_l) for face detection + embeddings, mediapipe FaceLandmarker for 478-point landmarks. Hybrid approach: insightface finds/identifies the subject, mediapipe provides precise landmarks + iris positions.
 - **02_align_faces.py**: Single-pass affine transform (rotation + scale + translation) placing eyes at fixed coordinates. Outputs 1024×1024 PNGs to `aligned/`.
 - **03_sort_images.py**: Orders images chronologically by extracted date (filename or EXIF). Writes `__sequence__` to manifest.
-- **04_render_morph.py**: Two modes — `--crossfade` (alpha blend) or default Delaunay triangulation morphing. Renders opening/ending title cards, age labels, optional vignette. Writes `render_info.json` with timing data for the encoder.
-- **05_encode_video.py**: FFmpeg H.264 encoding (CRF 18, slow preset, yuv420p). Accepts multiple `--music` files: single file loops, multiple files are concatenated via FFmpeg concat filter. Handles music delay (starts after title card), audio fade-out over last 3 seconds.
+- **04_render_morph.py**: Two modes — `--crossfade` (alpha blend) or default Delaunay triangulation morphing. Renders opening/ending title cards, age labels, optional vignette, and Barnett Labs credit card (©year, fade-in + 3s hold). Writes `render_info.json` with timing data for the encoder.
+- **05_encode_video.py**: FFmpeg H.264 encoding (CRF 18, slow preset, yuv420p). Output filename derived from subject_name (e.g. "Growing Up - Ryan.mp4"). Accepts multiple `--music` files: single file loops via `-stream_loop -1`; multiple files crossfade via FFmpeg `acrossfade` filter (3s overlap). Handles music delay (starts after title card), audio fade-out over last 3 seconds.
 
 ### Web App Architecture
 
@@ -101,7 +101,7 @@ Uses the tasks API (`mp.tasks.vision.FaceLandmarker`), NOT the deprecated `mp.so
 
 ### Path Resolution (utils.py)
 
-`PROJECT_ROOT` = parent of `Code/`. All paths derived from there. Environment variables (`GROWUP_PROJECT_ROOT`, `GROWUP_IMAGES_DIR`, `GROWUP_ALIGNED_DIR`, `GROWUP_FRAMES_DIR`, `GROWUP_OUTPUT_DIR`) override defaults — this is how the webapp isolates per-subject runs.
+`PROJECT_ROOT` = parent of `Code/`. All paths derived from there. Environment variables (`GROWUP_PROJECT_ROOT`, `GROWUP_CODE_DIR`, `GROWUP_IMAGES_DIR`, `GROWUP_ALIGNED_DIR`, `GROWUP_FRAMES_DIR`, `GROWUP_OUTPUT_DIR`) override defaults — this is how the webapp isolates per-subject runs. `GROWUP_CODE_DIR` separates bundled Code/ scripts from user data when running as a PyInstaller app.
 
 ### Age Label Computation
 
@@ -120,9 +120,19 @@ The Save Settings button starts disabled/grey and turns blue only when a setting
 Music is stored as a JSON list in `subjects.json`. Key helpers in `app.py`:
 - `get_music_list(info)`: Returns music as a list (handles legacy string format)
 - `resolve_music_paths(info)`: Resolves to list of absolute file paths
-The encoder (`05_encode_video.py`) accepts `--music` with `nargs="*"`: single file loops via `-stream_loop -1`; multiple files use FFmpeg `concat` filter to join audio before applying delay and fade-out.
+The encoder (`05_encode_video.py`) accepts `--music` with `nargs="*"`: single file loops via `-stream_loop -1`; multiple files use FFmpeg `acrossfade` filter (3s crossfade overlap) before applying delay and fade-out.
+
+### PyInstaller macOS App Packaging
+
+`packaging/macos/` contains everything needed to build a standalone `.app`:
+- **launcher.py**: Entry point — creates `~/Documents/Growing Up/` user data dir, sets env vars (`GROWUP_PROJECT_ROOT` → user data, `GROWUP_CODE_DIR` → bundle), adds bundled ffmpeg to PATH, imports Flask app, opens browser.
+- **GrowingUp.spec**: PyInstaller one-dir spec. Bundles Code/ scripts, ML models, webapp/, ffmpeg binaries. Excludes insightface's x86_64-only `mesh_core_cython.so` (stubbed at runtime). Hidden imports for insightface, onnxruntime, mediapipe, scipy, etc.
+- **build.sh**: Generates icon.icns from apple-touch-icon.png, downloads static ffmpeg arm64 binaries (~80 MB from evermeet.cx), runs PyInstaller, optionally code signs (`--sign`) and notarizes (`--notarize`). Output: `dist/Growing Up.app` + `dist/Growing Up.dmg` (~185 MB).
+- **entitlements.plist**: Allows JIT memory (numpy/scipy), disables library validation for bundled .so files.
+- `pipeline_runner.py` detects `sys.frozen` to use `sys.executable` instead of venv python when running as a bundled app.
 
 ## Tech Stack
 
 - Python 3.11+ (tested with 3.14), Flask, insightface, mediapipe, OpenCV, numpy, Pillow, FFmpeg
+- PyInstaller for macOS .app packaging
 - Designed for macOS (Apple Silicon), venv at project root

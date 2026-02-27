@@ -21,14 +21,44 @@ The app includes both a **command-line pipeline** and a **web dashboard** for ma
 - **Image scrubber**: Flip through aligned faces with slider, prev/next buttons, or arrow keys
 - **Age overlay**: Displays computed age ("Newborn", "3 months", "Age 5", etc.) on both the scrubber preview and the rendered video
 - **Vignette**: Optional oval vignette mask around the face (toggle on/off per subject)
-- **Title cards**: Opening title (subject name) with fade, ending title card with fade-in
-- **Multiple music tracks**: Add one or more MP3s per subject — they play back-to-back in the video. A single track loops; multiple tracks are concatenated.
+- **Title cards**: Opening title (subject name) with fade, ending title card with fade-in, Barnett Labs credit card
+- **Multiple music tracks**: Add one or more MP3s per subject — a single track loops; multiple tracks crossfade (3s overlap) between each other.
 - **Music timing**: Background music starts after the opening title fades out; music fades to silence over the last 3 seconds
 - **Multi-subject support**: Manage multiple people from the web dashboard, each with independent settings and data
 - **Delete & review**: Remove bad images from the scrubber; originals are moved to a `deleted/` folder (not permanently removed)
 - **Browse anywhere**: Images and music can live anywhere on your disk — just browse to them in the UI. Previously used locations are remembered across subjects.
 
-## Quick Start
+## Mac App (Recommended)
+
+Download the latest `Growing Up.dmg` from the Releases page. Open the DMG, drag `Growing Up.app` to Applications, and double-click to launch. No Python, FFmpeg, or terminal required — everything is bundled inside the app.
+
+On first launch:
+- Your browser opens to the dashboard at `http://localhost:5001`
+- User data is stored in `~/Documents/Growing Up/`
+- The insightface face recognition model (~300 MB) downloads automatically on first "Process Images"
+
+### Building the App from Source
+
+```bash
+# Install PyInstaller
+source venv/bin/activate
+pip install pyinstaller
+
+# Build unsigned .app + .dmg
+./packaging/macos/build.sh
+
+# Build with code signing (for distribution)
+DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)" ./packaging/macos/build.sh --sign
+
+# Build with code signing + notarization
+DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)" \
+TEAM_ID="YOUR_TEAM_ID" \
+./packaging/macos/build.sh --notarize
+```
+
+Output: `dist/Growing Up.app` and `dist/Growing Up.dmg` (~185 MB).
+
+## Developer Setup
 
 ### Prerequisites
 
@@ -135,6 +165,11 @@ webapp/            Flask web dashboard
   pipeline_runner.py  Background subprocess execution
   static/          CSS + JavaScript
   templates/       Jinja2 HTML templates
+packaging/macos/   PyInstaller app packaging
+  launcher.py      App entry point (sets up user data dir, env vars, launches Flask)
+  GrowingUp.spec   PyInstaller spec (dependencies, hidden imports, bundle config)
+  build.sh         Build + codesign + DMG + notarize script
+  entitlements.plist  macOS code signing entitlements
 subjects/          Per-subject working data (auto-created)
 config.json        Pipeline settings (fps, morph duration, etc.)
 requirements.txt   Python dependencies
