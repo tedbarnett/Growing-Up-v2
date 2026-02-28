@@ -11,6 +11,7 @@ and opens the browser.
 import json
 import os
 import shutil
+import socket
 import sys
 import threading
 import time
@@ -87,6 +88,12 @@ def setup_environment(bundle_dir, user_data_dir):
         os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
 
 
+def is_port_in_use(port):
+    """Check if a port is already in use."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
 def open_browser_delayed(port, delay=1.5):
     """Open the default browser after a short delay to let Flask start."""
     def _open():
@@ -120,6 +127,13 @@ def main():
     auto_migrate()
 
     port = int(os.environ.get("GROWUP_PORT", 5001))
+
+    # Check if already running — if so, just open the browser
+    if is_port_in_use(port):
+        print(f"Growing Up is already running at http://localhost:{port}")
+        webbrowser.open(f"http://localhost:{port}")
+        return
+
     print(f"Starting Growing Up at http://localhost:{port}")
 
     open_browser_delayed(port)

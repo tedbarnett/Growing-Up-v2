@@ -5,6 +5,7 @@ Writes job_status.json for SSE polling.
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -18,7 +19,17 @@ PROJECT_ROOT = Path(os.environ.get("GROWUP_PROJECT_ROOT",
 CODE_DIR = Path(os.environ.get("GROWUP_CODE_DIR",
                 str(Path(__file__).resolve().parent.parent / "Code")))
 if getattr(sys, 'frozen', False):
-    VENV_PYTHON = sys.executable
+    # When running as a PyInstaller bundle, sys.executable points to the app
+    # binary — we must NOT use it to run scripts (it re-launches the whole app).
+    # Instead, use the bundled Python interpreter inside the PyInstaller dir.
+    _meipass = Path(sys._MEIPASS)
+    # PyInstaller bundles a Python executable we can use
+    _bundled_python = _meipass / "python"
+    if _bundled_python.exists():
+        VENV_PYTHON = str(_bundled_python)
+    else:
+        # Fallback: use system python3
+        VENV_PYTHON = shutil.which("python3") or "python3"
 else:
     VENV_PYTHON = str(PROJECT_ROOT / "venv" / "bin" / "python")
 
