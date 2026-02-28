@@ -279,7 +279,11 @@ def auto_select_references(app, image_files, num_refs=5):
         if img is None:
             continue
 
-        faces = app.get(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        try:
+            faces = app.get(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        except (AttributeError, Exception):
+            # Some images cause insightface landmark estimation to fail
+            continue
         if len(faces) == 1:
             face = faces[0]
             area = (face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1])

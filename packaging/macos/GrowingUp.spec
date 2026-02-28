@@ -14,9 +14,11 @@ from pathlib import Path
 
 block_cipher = None
 
-# Find mediapipe's tasks/c directory (contains libmediapipe.dylib)
-_site_packages = Path(os.popen("python -c \"import mediapipe; print(mediapipe.__path__[0])\"").read().strip())
-_mediapipe_tasks_c = str(_site_packages / "tasks" / "c")
+# Find package data directories needed at runtime
+_mediapipe_root = Path(os.popen("python -c \"import mediapipe; print(mediapipe.__path__[0])\"").read().strip())
+_mediapipe_tasks_c = str(_mediapipe_root / "tasks" / "c")
+_insightface_root = Path(os.popen("python -c \"import importlib.util; print(importlib.util.find_spec('insightface').submodule_search_locations[0])\"").read().strip())
+_insightface_data_objects = str(_insightface_root / "data" / "objects")
 
 PROJECT_ROOT = Path(os.path.abspath(SPECPATH)).parent.parent
 PACKAGING_DIR = PROJECT_ROOT / "packaging" / "macos"
@@ -40,6 +42,8 @@ a = Analysis(
         (str(PROJECT_ROOT / "webapp" / "static"), "webapp/static"),
         # mediapipe native bindings package (for importlib.resources to find the dylib)
         (_mediapipe_tasks_c + "/__init__.py", "mediapipe/tasks/c"),
+        # insightface data objects (meanshape_68.pkl needed by landmark model)
+        (_insightface_data_objects + "/meanshape_68.pkl", "insightface/data/objects"),
         # Bundled ffmpeg/ffprobe (added by build.sh into packaging/macos/bin/)
         (str(PACKAGING_DIR / "bin" / "ffmpeg"), "bin"),
         (str(PACKAGING_DIR / "bin" / "ffprobe"), "bin"),
