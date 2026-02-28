@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Growing Up — Face Morph Video Generator</title>
+    <link rel="icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/icon.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #fdf2f4;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .preview-video {
+            width: 256px;
+            height: 256px;
+            border-radius: 28px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            margin-bottom: 32px;
+            object-fit: cover;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+        }
+
+        .tagline {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 40px;
+            line-height: 1.5;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .btn-group {
+            text-align: center;
+        }
+
+        .download-btn {
+            display: inline-block;
+            background: #d64e6a;
+            color: white;
+            text-decoration: none;
+            padding: 16px 40px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: background 0.2s, transform 0.1s;
+            box-shadow: 0 4px 12px rgba(214, 78, 106, 0.3);
+        }
+
+        .download-btn:hover {
+            background: #c4405a;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(214, 78, 106, 0.4);
+        }
+
+        .download-btn:active {
+            transform: translateY(0);
+        }
+
+        .download-btn.disabled {
+            background: #ccc;
+            box-shadow: none;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        .btn-meta {
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: #999;
+        }
+
+        .free-badge {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #3b82f6;
+            color: white;
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 800;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            transform: rotate(12deg);
+            z-index: 10;
+        }
+
+        .description {
+            margin-top: 48px;
+            font-size: 1rem;
+            color: #555;
+            line-height: 1.7;
+            text-align: left;
+            background: white;
+            padding: 28px 32px;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .description ul {
+            margin-top: 12px;
+            padding-left: 20px;
+        }
+
+        .description li {
+            margin-bottom: 8px;
+        }
+
+        .footer {
+            margin-top: 48px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
+        .footer a {
+            color: #d64e6a;
+            text-decoration: none;
+        }
+
+        .requirements {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            color: #bbb;
+        }
+
+        @media (max-width: 480px) {
+            h1 { font-size: 2rem; }
+            .tagline { font-size: 1rem; }
+            .description { padding: 20px 24px; }
+        }
+    </style>
+</head>
+<body>
+    <a href="https://buymeacoffee.com/barnettlabs" class="free-badge" style="text-decoration: none; color: white;">Free!</a>
+
+    <div class="container">
+        <video src="/preview.mp4" class="preview-video" autoplay loop muted playsinline></video>
+        <h1>Growing Up</h1>
+        <p class="tagline">Turn photos of your favorite people into smooth, face-morphing videos showing a lifetime of change.</p>
+
+        <div class="buttons">
+            <div class="btn-group">
+                <a href="https://downloads.barnettlabs.tech/Growing-Up.dmg" class="download-btn">Download for Mac</a>
+                <p class="btn-meta">~190 MB, Mac M1 or later</p>
+            </div>
+            <div class="btn-group">
+                <span class="download-btn disabled">Download for Windows</span>
+                <p class="btn-meta">Coming Soon!</p>
+            </div>
+        </div>
+
+        <div class="description">
+            <strong>How it works:</strong>
+            <ul>
+                <li>Drop in photos spanning years or decades</li>
+                <li>AI detects and aligns faces automatically</li>
+                <li>Review and curate with a built-in scrubber</li>
+                <li>Generate a polished morphing video with music</li>
+                <li>Runs entirely on your Mac &mdash; photos stay private</li>
+                <li><a href="/instructions.html" style="color: #d64e6a; text-decoration: none; font-weight: 500;">How to prepare your photos &rarr;</a></li>
+            </ul>
+        </div>
+
+
+        <p class="footer">&copy; 2026 <a href="https://tedbarnett.com">Barnett Labs</a></p>
+    </div>
+</body>
+</html>

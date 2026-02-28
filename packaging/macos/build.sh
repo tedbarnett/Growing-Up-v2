@@ -33,11 +33,11 @@ VOLUME_NAME="Growing Up"
 
 # Code signing identity — set this to your Developer ID Application cert.
 # You can also export DEVELOPER_ID="Developer ID Application: ..." before running.
-DEVELOPER_ID="${DEVELOPER_ID:-}"
+DEVELOPER_ID="${DEVELOPER_ID:-Developer ID Application: Theodore Barnett (63K8J7P389)}"
 
 # Notarization credentials
-APPLE_ID="${APPLE_ID:-info@barnettlabs.com}"
-TEAM_ID="${TEAM_ID:-}"
+APPLE_ID="${APPLE_ID:-looper521@me.com}"
+TEAM_ID="${TEAM_ID:-63K8J7P389}"
 
 # Parse flags
 DO_SIGN=false
