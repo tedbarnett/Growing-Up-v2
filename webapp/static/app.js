@@ -39,6 +39,9 @@ function openBrowseModal(inputId, browseType, extFilter) {
             startPath = currentVal;
         }
     }
+    if (!startPath) {
+        startPath = localStorage.getItem('growup_last_browse_dir') || '';
+    }
     browseNavigate(startPath);
 }
 
@@ -239,6 +242,14 @@ function browseConfirm() {
     }
 
     if (value) {
+        // Remember the directory for next time
+        var dirToSave = _browseState.browseType === 'files'
+            ? _browseState.currentPath
+            : value;
+        if (dirToSave) {
+            localStorage.setItem('growup_last_browse_dir', dirToSave);
+        }
+
         var input = _browseState.targetElement ||
                     (_browseState.targetInputId ? document.getElementById(_browseState.targetInputId) : null);
         if (input) {
@@ -346,6 +357,9 @@ function openBrowseForMusic(btn) {
     if (currentVal && currentVal.startsWith('/')) {
         var lastSlash = currentVal.lastIndexOf('/');
         startPath = lastSlash > 0 ? currentVal.substring(0, lastSlash) : '/';
+    }
+    if (!startPath) {
+        startPath = localStorage.getItem('growup_last_browse_dir') || '';
     }
     browseNavigate(startPath);
 }

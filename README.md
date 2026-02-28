@@ -26,7 +26,7 @@ The app includes both a **command-line pipeline** and a **web dashboard** for ma
 - **Music timing**: Background music starts after the opening title fades out; music fades to silence over the last 3 seconds
 - **Multi-subject support**: Manage multiple people from the web dashboard, each with independent settings and data
 - **Delete & review**: Remove bad images from the scrubber; originals are moved to a `deleted/` folder (not permanently removed)
-- **Browse anywhere**: Images and music can live anywhere on your disk — just browse to them in the UI. Previously used locations are remembered across subjects.
+- **Browse anywhere**: Images and music can live anywhere on your disk — just browse to them in the UI. The browser remembers your last-used directory so you don't start from home every time.
 
 ## Mac App (Recommended)
 

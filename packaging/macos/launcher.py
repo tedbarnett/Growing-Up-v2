@@ -142,5 +142,54 @@ def main():
     app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
 
 
+def run_script_mode():
+    """Run a pipeline script directly (used by pipeline_runner in frozen mode).
+
+    When the app is launched with: Growing Up --run-script path/to/script.py [args...]
+    we skip the Flask server and just execute the given script within the
+    bundled Python environment, so all dependencies (insightface, mediapipe,
+    cv2, etc.) are available.
+
+    All GROWUP_* env vars are already set by pipeline_runner._build_env() in
+    the parent process — we just need to put the Code dir on sys.path so
+    scripts can ``import utils``, and set sys.argv for argparse.
+    """
+    import runpy
+
+    script_path = sys.argv[2]
+    script_args = sys.argv[3:]
+
+    # Add Code dir to sys.path so scripts can import utils, etc.
+    # GROWUP_CODE_DIR is set by the parent process; fall back to bundle dir.
+    code_dir = os.environ.get("GROWUP_CODE_DIR")
+    if code_dir:
+        sys.path.insert(0, code_dir)
+    else:
+        sys.path.insert(0, str(get_bundle_dir() / "Code"))
+
+    # Ensure bundled ffmpeg is on PATH when frozen
+    if getattr(sys, "frozen", False):
+        bin_dir = get_bundle_dir() / "bin"
+        if bin_dir.exists() and str(bin_dir) not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+
+    # Stub out matplotlib if missing — mediapipe's __init__ imports drawing_utils
+    # which requires matplotlib, but we never use drawing functions.
+    if "matplotlib" not in sys.modules:
+        import types
+        mpl = types.ModuleType("matplotlib")
+        mpl.pyplot = types.ModuleType("matplotlib.pyplot")
+        sys.modules["matplotlib"] = mpl
+        sys.modules["matplotlib.pyplot"] = mpl.pyplot
+
+    # Replace sys.argv so argparse inside the script works correctly
+    sys.argv = [script_path] + script_args
+
+    runpy.run_path(script_path, run_name="__main__")
+
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) >= 3 and sys.argv[1] == "--run-script":
+        run_script_mode()
+    else:
+        main()

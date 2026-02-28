@@ -97,7 +97,11 @@ insightface requires Cython module stubs on Apple Silicon. See `01_detect_faces.
 
 ### mediapipe API
 
-Uses the tasks API (`mp.tasks.vision.FaceLandmarker`), NOT the deprecated `mp.solutions` API. Model file: `Code/face_landmarker_v2_with_blendshapes.task`.
+Uses the tasks API (`mp.tasks.vision.FaceLandmarker`), NOT the deprecated `mp.solutions` API. Model file: `Code/face_landmarker_v2_with_blendshapes.task`. Note: mediapipe's `__init__` imports `drawing_utils` which requires matplotlib — in the bundled app, matplotlib is excluded (too large) and stubbed at runtime in `launcher.py`.
+
+### Browse Modal — Last Directory Memory
+
+The file/folder browse modal saves the last-used directory to `localStorage` (`growup_last_browse_dir`). When opened with an empty input field, it starts at the last-used directory instead of home. Applies to both folder browsing (images) and file browsing (music).
 
 ### Path Resolution (utils.py)
 
@@ -125,11 +129,11 @@ The encoder (`05_encode_video.py`) accepts `--music` with `nargs="*"`: single fi
 ### PyInstaller macOS App Packaging
 
 `packaging/macos/` contains everything needed to build a standalone `.app`:
-- **launcher.py**: Entry point — creates `~/Documents/Growing Up/` user data dir, sets env vars (`GROWUP_PROJECT_ROOT` → user data, `GROWUP_CODE_DIR` → bundle), adds bundled ffmpeg to PATH, imports Flask app, opens browser.
-- **GrowingUp.spec**: PyInstaller one-dir spec. Bundles Code/ scripts, ML models, webapp/, ffmpeg binaries. Excludes insightface's x86_64-only `mesh_core_cython.so` (stubbed at runtime). Hidden imports for insightface, onnxruntime, mediapipe, scipy, etc.
+- **launcher.py**: Entry point with two modes: (1) normal launch — creates `~/Documents/Growing Up/` user data dir, sets env vars, imports Flask app, opens browser; (2) `--run-script` mode — runs a pipeline script via `runpy.run_path()` within the bundled Python environment, giving it access to all bundled dependencies. Stubs out matplotlib (not bundled, but mediapipe imports it via drawing_utils).
+- **GrowingUp.spec**: PyInstaller one-dir spec. Bundles Code/ scripts, ML models, webapp/, ffmpeg binaries, mediapipe native library (`libmediapipe.dylib`). Excludes insightface's x86_64-only `mesh_core_cython.so` (stubbed at runtime). Hidden imports for insightface, onnxruntime, mediapipe, scipy, etc.
 - **build.sh**: Generates icon.icns from apple-touch-icon.png, downloads static ffmpeg arm64 binaries (~80 MB from evermeet.cx), runs PyInstaller, optionally code signs (`--sign`) and notarizes (`--notarize`). Output: `dist/Growing Up.app` + `dist/Growing Up.dmg` (~185 MB).
 - **entitlements.plist**: Allows JIT memory (numpy/scipy), disables library validation for bundled .so files.
-- `pipeline_runner.py` detects `sys.frozen` to use `sys.executable` instead of venv python when running as a bundled app.
+- `pipeline_runner.py` detects `sys.frozen` to use `[sys.executable, "--run-script", script_path]` instead of venv python when running as a bundled app. The `--run-script` flag causes launcher.py to run the script via `runpy` instead of starting the Flask server.
 
 ## Tech Stack
 

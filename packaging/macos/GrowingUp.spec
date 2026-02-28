@@ -9,9 +9,14 @@ Or use build.sh which handles everything including code signing and DMG.
 """
 
 import os
+import glob
 from pathlib import Path
 
 block_cipher = None
+
+# Find mediapipe's tasks/c directory (contains libmediapipe.dylib)
+_site_packages = Path(os.popen("python -c \"import mediapipe; print(mediapipe.__path__[0])\"").read().strip())
+_mediapipe_tasks_c = str(_site_packages / "tasks" / "c")
 
 PROJECT_ROOT = Path(os.path.abspath(SPECPATH)).parent.parent
 PACKAGING_DIR = PROJECT_ROOT / "packaging" / "macos"
@@ -19,7 +24,10 @@ PACKAGING_DIR = PROJECT_ROOT / "packaging" / "macos"
 a = Analysis(
     [str(PACKAGING_DIR / "launcher.py")],
     pathex=[str(PROJECT_ROOT / "webapp")],
-    binaries=[],
+    binaries=[
+        # mediapipe native library (loaded via importlib.resources)
+        (_mediapipe_tasks_c + "/libmediapipe.dylib", "mediapipe/tasks/c"),
+    ],
     datas=[
         # Code/ pipeline scripts and ML model files
         (str(PROJECT_ROOT / "Code" / "*.py"), "Code"),
@@ -30,6 +38,8 @@ a = Analysis(
         (str(PROJECT_ROOT / "webapp" / "pipeline_runner.py"), "webapp"),
         (str(PROJECT_ROOT / "webapp" / "templates"), "webapp/templates"),
         (str(PROJECT_ROOT / "webapp" / "static"), "webapp/static"),
+        # mediapipe native bindings package (for importlib.resources to find the dylib)
+        (_mediapipe_tasks_c + "/__init__.py", "mediapipe/tasks/c"),
         # Bundled ffmpeg/ffprobe (added by build.sh into packaging/macos/bin/)
         (str(PACKAGING_DIR / "bin" / "ffmpeg"), "bin"),
         (str(PACKAGING_DIR / "bin" / "ffprobe"), "bin"),
@@ -54,6 +64,7 @@ a = Analysis(
         # mediapipe
         "mediapipe",
         "mediapipe.tasks",
+        "mediapipe.tasks.c",
         "mediapipe.tasks.python",
         "mediapipe.tasks.python.vision",
         # scipy (used by insightface)

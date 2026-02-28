@@ -19,19 +19,14 @@ PROJECT_ROOT = Path(os.environ.get("GROWUP_PROJECT_ROOT",
 CODE_DIR = Path(os.environ.get("GROWUP_CODE_DIR",
                 str(Path(__file__).resolve().parent.parent / "Code")))
 if getattr(sys, 'frozen', False):
-    # When running as a PyInstaller bundle, sys.executable points to the app
-    # binary — we must NOT use it to run scripts (it re-launches the whole app).
-    # Instead, use the bundled Python interpreter inside the PyInstaller dir.
-    _meipass = Path(sys._MEIPASS)
-    # PyInstaller bundles a Python executable we can use
-    _bundled_python = _meipass / "python"
-    if _bundled_python.exists():
-        VENV_PYTHON = str(_bundled_python)
-    else:
-        # Fallback: use system python3
-        VENV_PYTHON = shutil.which("python3") or "python3"
+    # When running as a PyInstaller bundle, use the app's own executable with
+    # a --run-script flag. launcher.py intercepts this and runs the given
+    # script via runpy, giving it access to all bundled dependencies.
+    VENV_PYTHON = sys.executable
+    _FROZEN_PREFIX = ["--run-script"]
 else:
     VENV_PYTHON = str(PROJECT_ROOT / "venv" / "bin" / "python")
+    _FROZEN_PREFIX = []
 
 # Phase 1: image processing (steps 00-03)
 PROCESS_STEPS = [
@@ -171,7 +166,7 @@ def _run_pipeline(subject_name, subject_dir, config, steps, phase_name, music_pa
     for i, step in enumerate(steps):
         script_path = str(CODE_DIR / step["script"])
         args = step.get("args", [])
-        cmd = [VENV_PYTHON, script_path] + args
+        cmd = [VENV_PYTHON] + _FROZEN_PREFIX + [script_path] + args
 
         _write_status(subject_dir, {
             "state": "running",
