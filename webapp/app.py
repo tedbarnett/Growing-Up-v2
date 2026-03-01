@@ -8,6 +8,7 @@ Run with: venv/bin/python webapp/app.py
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -625,6 +626,7 @@ def aligned_sequence(name):
             "sort_date": entry.get("sort_date", ""),
             "year": entry.get("date", "")[:4] if entry.get("date", "") else "",
             "similarity": entry.get("similarity", None),
+            "date_source": entry.get("date_source", ""),
         })
 
     return jsonify({"images": images})
@@ -691,6 +693,175 @@ def delete_aligned(name, filename):
             pass
 
     return jsonify({"status": "deleted", "filename": filename})
+
+
+def normalize_date_input(raw):
+    """Normalize user-entered date to YYYY-MM-DD. Accepts YYYY, YYYY-MM, YYYY-MM-DD."""
+    raw = raw.strip()
+    m = re.match(r'^(\d{4})-(\d{1,2})-(\d{1,2})$', raw)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 1800 <= y <= 2099 and 1 <= mo <= 12 and 1 <= d <= 31:
+            return f"{y:04d}-{mo:02d}-{d:02d}"
+        return None
+    m = re.match(r'^(\d{4})-(\d{1,2})$', raw)
+    if m:
+        y, mo = int(m.group(1)), int(m.group(2))
+        if 1800 <= y <= 2099 and 1 <= mo <= 12:
+            return f"{y:04d}-{mo:02d}-15"
+        return None
+    m = re.match(r'^(\d{4})$', raw)
+    if m:
+        y = int(m.group(1))
+        if 1800 <= y <= 2099:
+            return f"{y:04d}-06-15"
+        return None
+    return None
+
+
+def _write_date_to_files(date_str, subject_name, filename, aligned_dir):
+    """Write the edited date into EXIF and filesystem timestamps for original + aligned files."""
+    import subprocess
+    from datetime import datetime
+    from PIL import Image as PilImage
+
+    # Parse the normalized date string (YYYY-MM-DD)
+    parts = date_str.split("-")
+    y, mo, d = int(parts[0]), int(parts[1]), int(parts[2])
+    dt = datetime(y, mo, d, 12, 0, 0)
+    exif_date = dt.strftime("%Y:%m:%d %H:%M:%S")
+    timestamp = dt.timestamp()
+
+    files_to_update = []
+
+    # Aligned file
+    aligned_path = aligned_dir / filename
+    if aligned_path.exists():
+        files_to_update.append(aligned_path)
+
+    # Original file
+    config = load_subject_config(subject_name)
+    images_folder = config.get("images_folder", "")
+    if images_folder:
+        images_path = Path(images_folder)
+        if not images_path.is_absolute():
+            images_path = IMAGES_ROOT / images_folder
+        original = images_path / filename
+        if original.exists():
+            files_to_update.append(original)
+
+    for fpath in files_to_update:
+        # Update filesystem mtime
+        try:
+            os.utime(str(fpath), (timestamp, timestamp))
+        except OSError:
+            pass
+
+        # Update macOS creation date
+        try:
+            formatted = dt.strftime("%m/%d/%Y %H:%M:%S")
+            subprocess.run(
+                ["SetFile", "-d", formatted, str(fpath)],
+                capture_output=True, timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+        # Write EXIF DateTimeOriginal for JPEG/TIFF files
+        suffix = fpath.suffix.lower()
+        if suffix in (".jpg", ".jpeg", ".tiff", ".tif"):
+            try:
+                img = PilImage.open(fpath)
+                exif = img.getexif()
+                exif[36867] = exif_date  # DateTimeOriginal
+                exif[306] = exif_date    # DateTime
+                img.save(fpath, exif=exif.tobytes())
+            except Exception:
+                pass
+
+
+@app.route("/subjects/<name>/aligned/<filename>/date", methods=["PUT"])
+def update_aligned_date(name, filename):
+    """Update the sort_date for an aligned image and re-sort the sequence."""
+    subjects = load_subjects()
+    if name not in subjects:
+        return jsonify({"error": "Subject not found"}), 404
+
+    subject_dir = get_subject_dir(name)
+    manifest_path = subject_dir / "manifest.json"
+    aligned_dir = subject_dir / "aligned"
+
+    if not manifest_path.exists():
+        return jsonify({"error": "No manifest found"}), 404
+    if not (aligned_dir / filename).exists():
+        return jsonify({"error": "Aligned image not found"}), 404
+
+    data = request.get_json()
+    if not data or "date" not in data:
+        return jsonify({"error": "Missing 'date' field"}), 400
+
+    normalized = normalize_date_input(data["date"])
+    if normalized is None:
+        return jsonify({"error": "Invalid date format. Use YYYY, YYYY-MM, or YYYY-MM-DD"}), 400
+
+    try:
+        with open(manifest_path, "r") as f:
+            manifest = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return jsonify({"error": "Could not read manifest"}), 500
+
+    if filename not in manifest:
+        return jsonify({"error": "Image not in manifest"}), 404
+
+    # Update the entry
+    manifest[filename]["sort_date"] = normalized
+    manifest[filename]["sort_year"] = int(normalized[:4])
+    manifest[filename]["date_source"] = "manual"
+
+    # Write date into file EXIF and filesystem timestamps
+    _write_date_to_files(normalized, name, filename, aligned_dir)
+
+    # Re-sort sequence
+    seq_entries = []
+    for fname in manifest.get("__sequence__", []):
+        if fname in manifest and isinstance(manifest[fname], dict):
+            sd = manifest[fname].get("sort_date", "9999-06-15")
+            seq_entries.append((fname, sd))
+    seq_entries.sort(key=lambda x: (x[1], x[0]))
+
+    new_sequence = [e[0] for e in seq_entries]
+    manifest["__sequence__"] = new_sequence
+    for i, fname in enumerate(new_sequence):
+        if fname in manifest and isinstance(manifest[fname], dict):
+            manifest[fname]["sort_order"] = i
+
+    with open(manifest_path, "w") as f:
+        json.dump(manifest, f, indent=2)
+
+    # Build response with full re-sorted image list
+    images = []
+    for fname in new_sequence:
+        if not (aligned_dir / fname).exists():
+            continue
+        entry = manifest.get(fname, {})
+        images.append({
+            "filename": fname,
+            "date": entry.get("date", ""),
+            "sort_date": entry.get("sort_date", ""),
+            "year": entry.get("date", "")[:4] if entry.get("date", "") else "",
+            "similarity": entry.get("similarity", None),
+            "date_source": entry.get("date_source", ""),
+        })
+
+    new_index = next((i for i, img in enumerate(images) if img["filename"] == filename), 0)
+
+    return jsonify({
+        "status": "updated",
+        "filename": filename,
+        "sort_date": normalized,
+        "new_index": new_index,
+        "images": images,
+    })
 
 
 @app.route("/subjects/<name>/status")

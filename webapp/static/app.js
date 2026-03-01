@@ -791,8 +791,45 @@ function showScrubberImage(index) {
 
     var filenameEl = document.getElementById('scrubber-filename');
     if (filenameEl) {
-        filenameEl.textContent = img.filename;
+        var fname = img.filename;
+        // Update text content
+        var fnameText = filenameEl.querySelector('.scrubber-fname-text');
+        var fnameTip = filenameEl.querySelector('.scrubber-fname-tooltip');
+        if (fnameText && fnameTip) {
+            if (fname.length > 30) {
+                fnameText.textContent = fname.substring(0, 27) + '...';
+                fnameTip.textContent = fname;
+                filenameEl.classList.add('has-tooltip');
+            } else {
+                fnameText.textContent = fname;
+                fnameTip.textContent = '';
+                filenameEl.classList.remove('has-tooltip');
+            }
+        } else {
+            filenameEl.textContent = fname.length > 30 ? fname.substring(0, 27) + '...' : fname;
+        }
     }
+
+    // Show date and manual-edit indicator
+    var dateDisplay = document.getElementById('scrubber-date-display');
+    var dateText = document.getElementById('scrubber-date-text');
+    if (dateDisplay && dateText) {
+        var sortDate = img.sort_date || '';
+        var displayStr = sortDate;
+        if (sortDate && img.date_source === 'manual') {
+            displayStr = sortDate + ' (edited)';
+        }
+        dateText.textContent = displayStr || 'No date';
+        if (img.date_source === 'manual') {
+            dateDisplay.classList.add('date-manual');
+        } else {
+            dateDisplay.classList.remove('date-manual');
+        }
+    }
+
+    // Close any open date editor
+    var editor = document.getElementById('scrubber-date-editor');
+    if (editor) editor.classList.add('hidden');
 
     var slider = document.getElementById('scrubber-slider');
     if (slider) {
@@ -860,6 +897,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (_scrubberState.currentIndex < _scrubberState.images.length - 1) {
                 showScrubberImage(_scrubberState.currentIndex + 1);
             }
+        } else if (e.key === 'e' || e.key === 'E') {
+            e.preventDefault();
+            var dd = document.getElementById('scrubber-date-display');
+            if (dd) dd.click();
         }
     });
 
@@ -906,6 +947,98 @@ document.addEventListener('DOMContentLoaded', function () {
                 .catch(function (err) {
                     alert('Delete failed: ' + err);
                 });
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Filename tooltip (click to toggle on mobile)
+    // -----------------------------------------------------------------------
+    var fnameEl = document.getElementById('scrubber-filename');
+    if (fnameEl) {
+        fnameEl.addEventListener('click', function () {
+            if (fnameEl.classList.contains('has-tooltip')) {
+                fnameEl.classList.toggle('show-tooltip');
+            }
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Date Editing
+    // -----------------------------------------------------------------------
+    var dateDisplay = document.getElementById('scrubber-date-display');
+    var dateEditor = document.getElementById('scrubber-date-editor');
+    var dateInput = document.getElementById('scrubber-date-input');
+    var dateSave = document.getElementById('scrubber-date-save');
+    var dateCancel = document.getElementById('scrubber-date-cancel');
+
+    if (dateDisplay && dateEditor && dateInput) {
+        dateDisplay.addEventListener('click', function () {
+            var images = _scrubberState.images;
+            if (images.length === 0) return;
+            var img = images[_scrubberState.currentIndex];
+            dateInput.value = img.sort_date || '';
+            dateEditor.classList.remove('hidden');
+            dateInput.focus();
+            dateInput.select();
+        });
+
+        if (dateCancel) {
+            dateCancel.addEventListener('click', function () {
+                dateEditor.classList.add('hidden');
+            });
+        }
+
+        function saveDateEdit() {
+            var images = _scrubberState.images;
+            if (images.length === 0) return;
+            var img = images[_scrubberState.currentIndex];
+            var newDate = dateInput.value.trim();
+
+            if (!newDate) {
+                alert('Please enter a date (YYYY, YYYY-MM, or YYYY-MM-DD)');
+                return;
+            }
+            if (!/^\d{4}(-\d{1,2}(-\d{1,2})?)?$/.test(newDate)) {
+                alert('Invalid date format. Use YYYY, YYYY-MM, or YYYY-MM-DD');
+                return;
+            }
+
+            var subject = window.SUBJECT_NAME;
+            fetch('/subjects/' + encodeURIComponent(subject) + '/aligned/' +
+                  encodeURIComponent(img.filename) + '/date', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: newDate }),
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                _scrubberState.images = data.images;
+                var slider = document.getElementById('scrubber-slider');
+                if (slider) slider.max = data.images.length - 1;
+                showScrubberImage(data.new_index);
+                dateEditor.classList.add('hidden');
+            })
+            .catch(function (err) {
+                alert('Date update failed: ' + err);
+            });
+        }
+
+        if (dateSave) {
+            dateSave.addEventListener('click', saveDateEdit);
+        }
+
+        dateInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveDateEdit();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                dateEditor.classList.add('hidden');
+            }
         });
     }
 });

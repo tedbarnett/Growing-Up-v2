@@ -872,8 +872,115 @@ body {
 .scrubber-info {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     font-size: 0.8rem;
     color: var(--text-muted);
+}
+
+#scrubber-counter {
+    white-space: nowrap;
+}
+
+#scrubber-filename {
+    white-space: nowrap;
+    text-align: right;
+    cursor: default;
+    position: relative;
+}
+
+#scrubber-filename.has-tooltip {
+    cursor: pointer;
+}
+
+.scrubber-fname-tooltip {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #1e1e1e;
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+}
+
+.scrubber-fname-tooltip::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    right: 12px;
+    border: 5px solid transparent;
+    border-bottom-color: #1e1e1e;
+}
+
+#scrubber-filename.has-tooltip:hover .scrubber-fname-tooltip,
+#scrubber-filename.show-tooltip .scrubber-fname-tooltip {
+    display: block;
+}
+
+.scrubber-date-display {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    transition: background 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+.scrubber-date-display:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.scrubber-date-display.date-manual #scrubber-date-text {
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+.date-edit-icon {
+    font-size: 0.7rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.scrubber-date-display:hover .date-edit-icon {
+    opacity: 0.6;
+}
+
+.scrubber-date-editor {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+    padding: 0.4rem 0.5rem;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.scrubber-date-editor.hidden {
+    display: none;
+}
+
+.scrubber-date-editor input[type="text"] {
+    width: 130px;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.scrubber-date-editor input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(214, 78, 106, 0.12);
 }
 
 /* Video section */

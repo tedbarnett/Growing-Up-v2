@@ -160,7 +160,16 @@
                 </div>
                 <div class="scrubber-info">
                     <span id="scrubber-counter">0 / 0</span>
-                    <span id="scrubber-filename"></span>
+                    <span id="scrubber-date-display" class="scrubber-date-display" title="Click to edit date">
+                        <span id="scrubber-date-text"></span>
+                        <span class="date-edit-icon">&#9998;</span>
+                    </span>
+                    <span id="scrubber-filename" class="scrubber-filename"><span class="scrubber-fname-text"></span><span class="scrubber-fname-tooltip"></span></span>
+                </div>
+                <div id="scrubber-date-editor" class="scrubber-date-editor hidden">
+                    <input type="text" id="scrubber-date-input" placeholder="YYYY or YYYY-MM-DD" maxlength="10" autocomplete="off">
+                    <button id="scrubber-date-save" class="btn btn-primary btn-sm">Save</button>
+                    <button id="scrubber-date-cancel" class="btn btn-secondary btn-sm">Cancel</button>
                 </div>
             </div>
         </div>
