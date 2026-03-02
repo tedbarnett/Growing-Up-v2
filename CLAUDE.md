@@ -41,7 +41,7 @@ python webapp/app.py  # http://localhost:5001 (or GROWUP_PORT env var)
 The web dashboard splits the pipeline into two phases with a review step:
 
 - **Phase 1 — Process Images** (scripts 00-03): Convert → Detect faces → Align → Sort chronologically
-- **Review**: Scrubber/flipbook to review aligned faces, delete bad detections
+- **Review**: Scrubber/flipbook to review aligned faces, delete bad detections, edit dates
 - **Phase 2 — Generate Video** (scripts 04-05): Render morph frames → Encode MP4
 
 Each phase is launched separately. Aligned faces persist between sessions.
@@ -65,7 +65,7 @@ Images/*.jpg → 00_convert → 01_detect → 02_align → 03_sort → [review] 
 - `webapp/app.py`: Flask routes for subject CRUD, two-phase pipeline launch, aligned image serving/deletion, video serving, SSE progress
 - `webapp/pipeline_runner.py`: Runs pipeline scripts as subprocesses in background threads, writes `job_status.json` for progress. Defines `PROCESS_STEPS` (00-03) and `GENERATE_STEPS` (04-05).
 - SSE endpoint (`/subjects/<name>/status`) streams progress to the browser
-- `webapp/static/app.js`: SSE consumption, progress bar, scrubber/flipbook (slider + arrow keys + delete), phase-aware UI updates, age label computation, Finder-style file browser, path basename display, settings change tracking, dynamic multi-music row management
+- `webapp/static/app.js`: SSE consumption, progress bar, scrubber/flipbook (slider + arrow keys + delete + date editing), phase-aware UI updates, age label computation, Finder-style file browser, path basename display, settings change tracking, dynamic multi-music row management
 - `webapp/static/style.css`: Professional pink theme, mobile-responsive layout, scrubber styling, vignette CSS overlay, Finder-style browse modal with sidebar + breadcrumbs, custom path tooltips
 
 ### Key Routes
@@ -75,6 +75,7 @@ Images/*.jpg → 00_convert → 01_detect → 02_align → 03_sort → [review] 
 - `GET /subjects/<name>/aligned-sequence` — Ordered list of aligned images with metadata
 - `GET /subjects/<name>/aligned/<filename>` — Serve individual aligned image
 - `DELETE /subjects/<name>/aligned/<filename>` — Remove image from set
+- `PUT /subjects/<name>/aligned/<filename>/date` — Edit image date (re-sorts sequence, writes EXIF)
 - `DELETE /subjects/<name>/delete` — Delete subject entirely
 - `GET /subjects/<name>/status` — SSE progress stream
 
@@ -84,7 +85,7 @@ Each subject gets `subjects/<name>/` with its own config.json, manifest.json, an
 
 ### Key Data Files
 
-- **manifest.json**: Central data store — maps each image filename to face bbox, 512-dim embedding, 68 landmarks, iris positions, similarity score, date, sequence order, exclusion flags. The `__sequence__` key holds the chronologically sorted filename list.
+- **manifest.json**: Central data store — maps each image filename to face bbox, 512-dim embedding, 68 landmarks, iris positions, similarity score, date, sequence order, exclusion flags, `date_source` ("manual" if user-edited). The `__sequence__` key holds the chronologically sorted filename list.
 - **config.json**: Pipeline parameters — output_size, fps, hold_frames, morph_frames, eye target positions, subject_name, subject_birthdate, vignette toggle
 - **render_info.json**: Written by 04_render_morph.py to frames dir. Contains `music_delay_s` for the encoder to delay MP3 start.
 - **job_status.json**: Written per-subject during pipeline runs. Contains state, phase, step progress, log tail, error info.
@@ -114,6 +115,15 @@ Both Python (`04_render_morph.py:compute_age_label()`) and JavaScript (`app.js:c
 ### Video Duration Estimation
 
 Both Python (`app.py:get_projected_video_duration()`) and JavaScript (`app.js:updateScrubberDuration()`) compute estimated video length from aligned image count + config (fps, hold_frames, morph_frames). The JS version updates live in the scrubber title when images are deleted.
+
+### Date Editing in Scrubber
+
+During review, users can click the date (shown in blue) or press `E` to edit an image's date. Accepts "YYYY", "YYYY-MM", or "YYYY-MM-DD" — partial dates are normalized (month defaults to 06, day to 15). On save:
+- `normalize_date_input()` validates and normalizes the input
+- Manifest is updated (`sort_date`, `sort_year`, `date_source = "manual"`)
+- `__sequence__` is re-sorted chronologically; scrubber navigates to the image's new position
+- `_write_date_to_files()` writes the date into EXIF (DateTimeOriginal + DateTime tags for JPEG/TIFF) and filesystem timestamps (mtime + macOS creation date via `SetFile`) for both aligned and original source files
+- Manually-edited dates display in blue with "(edited)" marker
 
 ### Settings Form Change Tracking
 
