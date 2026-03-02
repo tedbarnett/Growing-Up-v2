@@ -863,8 +863,8 @@ body {
 
 .scrubber-info {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 10px;
     font-size: 0.8rem;
     color: var(--text-muted);
 }
@@ -878,6 +878,7 @@ body {
     text-align: right;
     cursor: default;
     position: relative;
+    margin-left: auto;
 }
 
 #scrubber-filename.has-tooltip {
