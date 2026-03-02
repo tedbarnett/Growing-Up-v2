@@ -788,35 +788,27 @@ body {
     position: absolute;
     top: 0.5rem;
     right: 0.5rem;
-    background: rgba(217, 64, 64, 0.85);
+    background: none;
     color: white;
     border: none;
     border-radius: 50%;
     width: 32px;
     height: 32px;
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-/* Show on hover (desktop) or on touch devices that lack hover */
-.scrubber-image-wrap:hover .btn-delete {
-    opacity: 1;
-}
-
-@media (hover: none) {
-    .btn-delete {
-        opacity: 0.85;
-    }
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    transition: transform 0.15s, color 0.15s, text-shadow 0.15s;
+    z-index: 5;
 }
 
 .btn-delete:hover {
-    background: var(--error);
+    color: #e53e3e;
+    transform: scale(1.4);
+    text-shadow: 0 0 6px rgba(229, 62, 62, 0.5);
 }
 
 .scrubber-year-label {
@@ -1144,9 +1136,6 @@ body {
         max-width: 100%;
     }
 
-    .btn-delete {
-        opacity: 1;
-    }
 }
 
 /* Small phone */
