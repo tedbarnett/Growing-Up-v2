@@ -103,6 +103,65 @@ def open_browser_delayed(port, delay=1.5):
     t.start()
 
 
+def _run_with_cocoa(flask_app, port):
+    """Run Flask in a background thread with a Cocoa event loop on the main
+    thread.  This lets macOS deliver 'reopen' Apple Events when the user
+    clicks the dock icon after closing the browser, so we can re-open it.
+    Also provides a proper menu bar with Quit (Cmd-Q).
+
+    Returns True if the Cocoa loop ran (and has now exited), False if PyObjC
+    is unavailable and the caller should fall back to running Flask directly.
+    """
+    try:
+        from AppKit import NSApplication, NSMenu, NSMenuItem, NSObject
+        from PyObjCTools import AppHelper
+    except ImportError:
+        return False
+
+    class AppDelegate(NSObject):
+        def applicationShouldHandleReopen_hasVisibleWindows_(self, sender, flag):
+            webbrowser.open(f"http://localhost:{port}")
+            return True
+
+        def openBrowser_(self, sender):
+            webbrowser.open(f"http://localhost:{port}")
+
+    # Start Flask in a daemon thread so it dies when the main thread exits
+    flask_thread = threading.Thread(
+        target=lambda: flask_app.run(
+            host="127.0.0.1", port=port, debug=False, use_reloader=False
+        ),
+        daemon=True,
+    )
+    flask_thread.start()
+
+    ns_app = NSApplication.sharedApplication()
+    ns_app.setActivationPolicy_(0)  # NSApplicationActivationPolicyRegular
+    delegate = AppDelegate.alloc().init()
+    ns_app.setDelegate_(delegate)
+
+    # Build menu bar: "Growing Up" app menu with Open in Browser + Quit
+    menu_bar = NSMenu.alloc().init()
+
+    app_menu = NSMenu.alloc().initWithTitle_("Growing Up")
+    open_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Open in Browser", "openBrowser:", "o")
+    open_item.setTarget_(delegate)
+    quit_item = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Quit Growing Up", "terminate:", "q")
+    app_menu.addItem_(open_item)
+    app_menu.addItem_(NSMenuItem.separatorItem())
+    app_menu.addItem_(quit_item)
+
+    app_menu_item = NSMenuItem.alloc().init()
+    app_menu_item.setSubmenu_(app_menu)
+    menu_bar.addItem_(app_menu_item)
+
+    ns_app.setMainMenu_(menu_bar)
+
+    # Run the Cocoa event loop (blocks until Cmd-Q / quit)
+    AppHelper.runEventLoop()
+    return True
+
+
 def main():
     bundle_dir = get_bundle_dir()
     user_data_dir = get_user_data_dir()
@@ -138,8 +197,10 @@ def main():
 
     open_browser_delayed(port)
 
-    # Run Flask — no debug/reloader in production
-    app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+    # Try to run with a Cocoa event loop so dock-icon re-clicks reopen the
+    # browser.  Falls back to running Flask directly if PyObjC is missing.
+    if not _run_with_cocoa(app, port):
+        app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
 
 
 def run_script_mode():

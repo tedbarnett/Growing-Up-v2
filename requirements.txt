@@ -6,3 +6,4 @@ numpy
 Pillow
 scipy
 onnxruntime
+pyobjc-framework-Cocoa; sys_platform == "darwin"

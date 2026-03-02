@@ -83,6 +83,13 @@ a = Analysis(
         "PIL.ExifTags",
         # Cython stubs for insightface on Apple Silicon
         "cython",
+        # PyObjC — macOS app lifecycle (dock icon reopen handling)
+        "objc",
+        "AppKit",
+        "Foundation",
+        "CoreFoundation",
+        "PyObjCTools",
+        "PyObjCTools.AppHelper",
         # Standard library modules sometimes missed
         "json",
         "pathlib",

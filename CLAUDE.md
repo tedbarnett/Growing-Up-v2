@@ -139,8 +139,8 @@ The encoder (`05_encode_video.py`) accepts `--music` with `nargs="*"`: single fi
 ### PyInstaller macOS App Packaging
 
 `packaging/macos/` contains everything needed to build a standalone `.app`:
-- **launcher.py**: Entry point with two modes: (1) normal launch — creates `~/Documents/Growing Up/` user data dir, sets env vars, imports Flask app, opens browser; (2) `--run-script` mode — runs a pipeline script via `runpy.run_path()` within the bundled Python environment, giving it access to all bundled dependencies. Stubs out matplotlib (not bundled, but mediapipe imports it via drawing_utils).
-- **GrowingUp.spec**: PyInstaller one-dir spec. Bundles Code/ scripts, ML models, webapp/, ffmpeg binaries, mediapipe native library (`libmediapipe.dylib`). Excludes insightface's x86_64-only `mesh_core_cython.so` (stubbed at runtime). Hidden imports for insightface, onnxruntime, mediapipe, scipy, etc.
+- **launcher.py**: Entry point with two modes: (1) normal launch — creates `~/Documents/Growing Up/` user data dir, sets env vars, imports Flask app, opens browser; (2) `--run-script` mode — runs a pipeline script via `runpy.run_path()` within the bundled Python environment, giving it access to all bundled dependencies. Stubs out matplotlib (not bundled, but mediapipe imports it via drawing_utils). Uses PyObjC (`pyobjc-framework-Cocoa`) to run a Cocoa event loop on the main thread with Flask in a background daemon thread — this handles macOS dock icon re-clicks (reopen Apple Events) to reopen the browser, and provides a native "Growing Up" menu bar with Open in Browser (Cmd-O) and Quit (Cmd-Q). Falls back to running Flask directly if PyObjC is unavailable.
+- **GrowingUp.spec**: PyInstaller one-dir spec. Bundles Code/ scripts, ML models, webapp/, ffmpeg binaries, mediapipe native library (`libmediapipe.dylib`). Excludes insightface's x86_64-only `mesh_core_cython.so` (stubbed at runtime). Hidden imports for insightface, onnxruntime, mediapipe, scipy, PyObjC (objc, AppKit, Foundation, CoreFoundation, PyObjCTools), etc.
 - **build.sh**: Generates icon.icns from apple-touch-icon.png, downloads static ffmpeg arm64 binaries (~80 MB from evermeet.cx), runs PyInstaller, optionally code signs (`--sign`) and notarizes (`--notarize`). Output: `dist/Growing Up.app` + `dist/Growing Up.dmg` (~185 MB).
 - **entitlements.plist**: Allows JIT memory (numpy/scipy), disables library validation for bundled .so files.
 - `pipeline_runner.py` detects `sys.frozen` to use `[sys.executable, "--run-script", script_path]` instead of venv python when running as a bundled app. The `--run-script` flag causes launcher.py to run the script via `runpy` instead of starting the Flask server.
@@ -148,5 +148,6 @@ The encoder (`05_encode_video.py`) accepts `--music` with `nargs="*"`: single fi
 ## Tech Stack
 
 - Python 3.11+ (tested with 3.14), Flask, insightface, mediapipe, OpenCV, numpy, Pillow, FFmpeg
+- PyObjC (pyobjc-framework-Cocoa) for native macOS app lifecycle (dock icon, menu bar, quit)
 - PyInstaller for macOS .app packaging
 - Designed for macOS (Apple Silicon), venv at project root

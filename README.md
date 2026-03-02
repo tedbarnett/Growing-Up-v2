@@ -30,12 +30,14 @@ The app includes both a **command-line pipeline** and a **web dashboard** for ma
 
 ## Mac App (Recommended)
 
-Download the latest `Growing Up.dmg` from the Releases page. Open the DMG, drag `Growing Up.app` to Applications, and double-click to launch. No Python, FFmpeg, or terminal required — everything is bundled inside the app.
+Download the latest `Growing Up.dmg` from [growingup.barnettlabs.tech](https://growingup.barnettlabs.tech). Open the DMG, drag `Growing Up.app` to Applications, and double-click to launch. No Python, FFmpeg, or terminal required — everything is bundled inside the app.
 
 On first launch:
 - Your browser opens to the dashboard at `http://localhost:5001`
 - User data is stored in `~/Documents/Growing Up/`
 - The insightface face recognition model (~300 MB) downloads automatically on first "Process Images"
+- A native **Growing Up** menu bar appears with Open in Browser (Cmd-O) and Quit (Cmd-Q)
+- Clicking the dock icon reopens your browser if you closed it
 
 ### Building the App from Source
 
@@ -166,7 +168,7 @@ webapp/            Flask web dashboard
   static/          CSS + JavaScript
   templates/       Jinja2 HTML templates
 packaging/macos/   PyInstaller app packaging
-  launcher.py      App entry point (sets up user data dir, env vars, launches Flask)
+  launcher.py      App entry point (env vars, Flask server, Cocoa event loop for dock/menu)
   GrowingUp.spec   PyInstaller spec (dependencies, hidden imports, bundle config)
   build.sh         Build + codesign + DMG + notarize script
   entitlements.plist  macOS code signing entitlements
@@ -188,3 +190,4 @@ Start Server.command  macOS double-click launcher
 | Video encoding | FFmpeg (H.264, CRF 18) |
 | Web dashboard | Flask + Server-Sent Events (SSE) |
 | Selfie segmentation | mediapipe (optional, for background darkening) |
+| macOS app lifecycle | PyObjC (dock icon reopen, native menu bar, Cmd-Q quit) |
