@@ -7,7 +7,9 @@
 
 {% block content %}
 <div class="subject-header">
-    <h1>{{ name }}</h1>
+    <input type="text" id="subject-name-input" class="subject-name-input"
+           value="{{ name }}" data-original="{{ name }}">
+    <div id="save-indicator" class="save-indicator hidden">Saved</div>
     {% if is_running %}
         <span class="badge badge-running">Pipeline Running</span>
     {% elif job_status and job_status.state == 'error' %}
@@ -19,26 +21,19 @@
     <!-- Left column: Settings -->
     <section class="settings-panel">
         <h2>Settings</h2>
-        <form action="{{ url_for('edit_subject', name=name) }}" method="post" class="settings-form">
+        <div class="settings-panel-fields">
             <div class="form-group">
                 <label for="birthdate">Birthdate</label>
                 <input type="date" id="birthdate" name="birthdate"
                        value="{{ info.birthdate or '' }}">
             </div>
             <div class="form-group">
-                <label for="images_folder">Images Folder</label>
-                <div class="input-with-browse">
-                    <input type="text" id="images_folder" name="images_folder"
-                           value="{{ info.images_folder or '' }}"
-                           placeholder="Select or browse for a folder..."
-                           list="images_folder_list">
-                    <datalist id="images_folder_list">
-                        {% for folder in image_folders %}
-                        <option value="{{ folder }}">
-                        {% endfor %}
-                    </datalist>
-                    <button type="button" class="btn btn-secondary btn-browse"
-                            onclick="openBrowseModal('images_folder', 'dirs')">Browse</button>
+                <label>Images Folder</label>
+                {% set folder_path = info.images_folder or '' %}
+                {% set folder_basename = folder_path.split('/')[-1] if '/' in (folder_path or '') else folder_path %}
+                <div class="images-folder-display path-basename">
+                    <span class="path-basename-text">{{ folder_basename or 'Not set' }}</span>
+                    <span class="path-tooltip">{{ folder_path }}</span>
                 </div>
             </div>
             <div class="form-group">
@@ -68,10 +63,9 @@
                 </label>
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-secondary">Save Settings</button>
                 <button type="button" id="delete-subject-btn" class="btn btn-danger" data-subject="{{ name }}">Delete Subject</button>
             </div>
-        </form>
+        </div>
 
         <div class="stats-block">
             <div class="stat">
@@ -84,16 +78,16 @@
             </div>
         </div>
         {% if video_duration or mp3_duration %}
-        <div class="stats-block">
+        <div class="stats-block" id="duration-stats">
             {% if video_duration %}
             <div class="stat">
-                <span class="stat-value">{{ '%d:%02d'|format(video_duration // 60, video_duration % 60) }}</span>
-                <span class="stat-label">Video Length</span>
+                <span class="stat-value" id="video-duration-value">{{ '%d:%02d'|format(video_duration // 60, video_duration % 60) }}</span>
+                <span class="stat-label">{% if has_video %}Video Length{% else %}Video Length (est.){% endif %}</span>
             </div>
             {% endif %}
             {% if mp3_duration %}
             <div class="stat">
-                <span class="stat-value">{{ '%d:%02d'|format(mp3_duration // 60, mp3_duration % 60) }}</span>
+                <span class="stat-value" id="music-duration-value">{{ '%d:%02d'|format(mp3_duration // 60, mp3_duration % 60) }}</span>
                 <span class="stat-label">Music Length</span>
             </div>
             {% endif %}

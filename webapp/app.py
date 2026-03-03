@@ -484,6 +484,84 @@ def edit_subject(name):
     return redirect(url_for("subject_detail", name=name))
 
 
+@app.route("/subjects/<name>/settings", methods=["PUT"])
+def update_settings(name):
+    """Auto-save individual settings (birthdate, music, vignette)."""
+    subjects = load_subjects()
+    if name not in subjects:
+        return jsonify({"error": "Subject not found"}), 404
+
+    if is_job_running(name):
+        return jsonify({"error": "Cannot update settings while pipeline is running"}), 409
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    config = load_subject_config(name)
+
+    if "birthdate" in data:
+        subjects[name]["birthdate"] = data["birthdate"]
+        config["subject_birthdate"] = data["birthdate"]
+
+    if "music" in data:
+        subjects[name]["music"] = data["music"]
+
+    if "vignette" in data:
+        subjects[name]["vignette"] = data["vignette"]
+        config["vignette"] = data["vignette"]
+
+    save_subjects(subjects)
+    save_subject_config(name, config)
+
+    return jsonify({"status": "saved"})
+
+
+@app.route("/subjects/<name>/rename", methods=["POST"])
+def rename_subject(name):
+    """Rename a subject: directory, registry key, config."""
+    subjects = load_subjects()
+    if name not in subjects:
+        return jsonify({"error": "Subject not found"}), 404
+
+    if is_job_running(name):
+        return jsonify({"error": "Cannot rename while pipeline is running"}), 409
+
+    data = request.get_json()
+    if not data or not data.get("new_name", "").strip():
+        return jsonify({"error": "New name is required"}), 400
+
+    new_name = data["new_name"].strip()
+
+    # Validate name
+    if "/" in new_name or "\\" in new_name:
+        return jsonify({"error": "Name cannot contain slashes"}), 400
+
+    if new_name == name:
+        return jsonify({"status": "unchanged"})
+
+    if new_name in subjects:
+        return jsonify({"error": "A subject with that name already exists"}), 409
+
+    # Rename directory
+    old_dir = get_subject_dir(name)
+    new_dir = get_subject_dir(new_name)
+    if old_dir.exists():
+        import shutil
+        shutil.move(str(old_dir), str(new_dir))
+
+    # Update subjects.json: move entry to new key
+    subjects[new_name] = subjects.pop(name)
+    save_subjects(subjects)
+
+    # Update config.json subject_name
+    config = load_subject_config(new_name)
+    config["subject_name"] = new_name
+    save_subject_config(new_name, config)
+
+    return jsonify({"status": "renamed", "url": url_for("subject_detail", name=new_name)})
+
+
 @app.route("/subjects/<name>/delete", methods=["DELETE"])
 def delete_subject(name):
     """Remove a subject from the registry and delete its working directory (not original images)."""
@@ -913,6 +991,24 @@ def serve_video(name):
     if not video:
         abort(404)
     return send_file(str(video), mimetype="video/mp4")
+
+
+@app.route("/subjects/<name>/music-duration", methods=["POST"])
+def music_duration(name):
+    """Return combined duration of the given music paths."""
+    data = request.get_json()
+    if not data or "paths" not in data:
+        return jsonify({"error": "Missing 'paths' field"}), 400
+
+    total = 0
+    for p in data["paths"]:
+        if not p or not p.strip():
+            continue
+        d = get_mp3_duration(p.strip())
+        if d:
+            total += d
+
+    return jsonify({"duration": total})
 
 
 @app.route("/api/mp3s")

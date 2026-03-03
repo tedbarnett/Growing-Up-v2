@@ -25,6 +25,8 @@ The app includes both a **command-line pipeline** and a **web dashboard** for ma
 - **Multiple music tracks**: Add one or more MP3s per subject — a single track loops; multiple tracks crossfade (3s overlap) between each other.
 - **Music timing**: Background music starts after the opening title fades out; music fades to silence over the last 3 seconds
 - **Multi-subject support**: Manage multiple people from the web dashboard, each with independent settings and data
+- **Editable subject names**: Click the name to rename — directory, config, and future video filenames update automatically
+- **Auto-save settings**: Birthdate, music, and vignette save instantly on change — no Save button needed
 - **Delete & review**: Remove bad images from the scrubber; originals are moved to a `deleted/` folder (not permanently removed)
 - **Browse anywhere**: Images and music can live anywhere on your disk — just browse to them in the UI. The browser remembers your last-used directory so you don't start from home every time.
 

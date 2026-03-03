@@ -65,13 +65,15 @@ Images/*.jpg → 00_convert → 01_detect → 02_align → 03_sort → [review] 
 - `webapp/app.py`: Flask routes for subject CRUD, two-phase pipeline launch, aligned image serving/deletion, video serving, SSE progress
 - `webapp/pipeline_runner.py`: Runs pipeline scripts as subprocesses in background threads, writes `job_status.json` for progress. Defines `PROCESS_STEPS` (00-03) and `GENERATE_STEPS` (04-05).
 - SSE endpoint (`/subjects/<name>/status`) streams progress to the browser
-- `webapp/static/app.js`: SSE consumption, progress bar, scrubber/flipbook (slider + arrow keys + delete + date editing), phase-aware UI updates, age label computation, Finder-style file browser, path basename display, settings change tracking, dynamic multi-music row management
+- `webapp/static/app.js`: SSE consumption, progress bar, scrubber/flipbook (slider + arrow keys + delete + date editing), phase-aware UI updates, age label computation, Finder-style file browser, path basename display, auto-save settings, subject rename, dynamic multi-music row management
 - `webapp/static/style.css`: Professional pink theme, mobile-responsive layout, scrubber styling, vignette CSS overlay, Finder-style browse modal with sidebar + breadcrumbs, custom path tooltips
 
 ### Key Routes
 
 - `POST /subjects/<name>/process-images` — Launch Phase 1
 - `POST /subjects/<name>/generate-video` — Launch Phase 2
+- `PUT /subjects/<name>/settings` — Auto-save settings (birthdate, music, vignette)
+- `POST /subjects/<name>/rename` — Rename subject (directory, registry, config)
 - `GET /subjects/<name>/aligned-sequence` — Ordered list of aligned images with metadata
 - `GET /subjects/<name>/aligned/<filename>` — Serve individual aligned image
 - `DELETE /subjects/<name>/aligned/<filename>` — Remove image from set
@@ -125,9 +127,13 @@ During review, users can click the date (shown in blue) or press `E` to edit an 
 - `_write_date_to_files()` writes the date into EXIF (DateTimeOriginal + DateTime tags for JPEG/TIFF) and filesystem timestamps (mtime + macOS creation date via `SetFile`) for both aligned and original source files
 - Manually-edited dates display in blue with "(edited)" marker
 
-### Settings Form Change Tracking
+### Auto-Save Settings
 
-The Save Settings button starts disabled/grey and turns blue only when a setting value differs from its initial state. Implemented via `app.js` settings form listener that captures initial values on page load. Uses event delegation on the form to handle dynamically added music input rows.
+Settings (birthdate, vignette, music) save automatically on change via `PUT /subjects/<name>/settings` — no Save button. A brief green "Saved" indicator flashes in the subject header after each save. Music changes are debounced (500ms). The images folder is displayed read-only (set at subject creation time).
+
+### Subject Rename
+
+The subject name is an editable heading-style input. On blur or Enter, if the name changed, `POST /subjects/<name>/rename` renames the directory, updates `subjects.json` and `config.json`, and redirects to the new URL. Escape reverts. Validation rejects empty names, slashes, and duplicates. Returns 409 if pipeline is running.
 
 ### Multi-Music Support
 

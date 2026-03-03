@@ -378,14 +378,14 @@ function addMusicRow() {
     list.appendChild(row);
     updateMusicRemoveButtons();
     initPathDisplayForWrapper(row.querySelector('.input-with-browse'));
-    if (window._checkForChanges) window._checkForChanges();
+    updateMusicDurationLive();
 }
 
 function removeMusicRow(btn) {
     var row = btn.closest('.music-row');
     if (row) row.remove();
     updateMusicRemoveButtons();
-    if (window._checkForChanges) window._checkForChanges();
+    saveCurrentMusic();
 }
 
 function updateMusicRemoveButtons() {
@@ -398,68 +398,205 @@ function updateMusicRemoveButtons() {
 
 
 // -----------------------------------------------------------------------
-// Settings Form — disable Save until changes
+// Live Music Duration Update
+// -----------------------------------------------------------------------
+
+var _musicDurationTimer = null;
+
+function updateMusicDurationLive() {
+    // Debounce: wait 300ms after last change before fetching
+    if (_musicDurationTimer) clearTimeout(_musicDurationTimer);
+    _musicDurationTimer = setTimeout(function() {
+        var paths = [];
+        document.querySelectorAll('#music-list input[name="music"]').forEach(function(input) {
+            if (input.value.trim()) paths.push(input.value.trim());
+        });
+
+        var el = document.getElementById('music-duration-value');
+        if (paths.length === 0) {
+            // No music — hide or clear the stat
+            if (el) el.textContent = '—';
+            return;
+        }
+
+        var subject = window.SUBJECT_NAME;
+        if (!subject) return;
+
+        fetch('/subjects/' + encodeURIComponent(subject) + '/music-duration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paths: paths }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.duration !== undefined && data.duration > 0) {
+                var secs = Math.round(data.duration);
+                var mins = Math.floor(secs / 60);
+                var rem = secs % 60;
+                var formatted = mins + ':' + (rem < 10 ? '0' : '') + rem;
+                // Create or update the music duration stat
+                if (!el) {
+                    // Need to create the stat element
+                    var statsBlock = document.getElementById('duration-stats');
+                    if (!statsBlock) {
+                        // Create the entire stats block after the first one
+                        var firstStats = document.querySelector('.stats-block');
+                        if (firstStats) {
+                            statsBlock = document.createElement('div');
+                            statsBlock.className = 'stats-block';
+                            statsBlock.id = 'duration-stats';
+                            firstStats.parentNode.insertBefore(statsBlock, firstStats.nextSibling);
+                        }
+                    }
+                    if (statsBlock) {
+                        var stat = document.createElement('div');
+                        stat.className = 'stat';
+                        stat.innerHTML = '<span class="stat-value" id="music-duration-value"></span><span class="stat-label">Music Length</span>';
+                        statsBlock.appendChild(stat);
+                        el = document.getElementById('music-duration-value');
+                    }
+                }
+                if (el) el.textContent = formatted;
+            } else if (el) {
+                el.textContent = '—';
+            }
+        })
+        .catch(function() {});
+    }, 300);
+}
+
+// Listen for music input changes via event delegation on the music list
+document.addEventListener('DOMContentLoaded', function() {
+    var musicList = document.getElementById('music-list');
+    if (musicList) {
+        musicList.addEventListener('change', function(e) {
+            if (e.target && e.target.name === 'music') {
+                saveCurrentMusic();
+            }
+        });
+    }
+});
+
+
+// -----------------------------------------------------------------------
+// Auto-Save Settings
+// -----------------------------------------------------------------------
+
+var _autoSaveTimer = null;
+
+function autoSaveSettings(fields) {
+    var subject = window.SUBJECT_NAME;
+    if (!subject) return;
+
+    return fetch('/subjects/' + encodeURIComponent(subject) + '/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            console.error('Auto-save error:', data.error);
+        } else {
+            showSaveIndicator();
+        }
+    })
+    .catch(function(err) {
+        console.error('Auto-save failed:', err);
+    });
+}
+
+function debouncedAutoSave(fields) {
+    if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+    _autoSaveTimer = setTimeout(function() {
+        autoSaveSettings(fields);
+    }, 500);
+}
+
+function showSaveIndicator() {
+    var el = document.getElementById('save-indicator');
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.classList.add('visible');
+    setTimeout(function() {
+        el.classList.remove('visible');
+        setTimeout(function() { el.classList.add('hidden'); }, 300);
+    }, 1500);
+}
+
+function saveCurrentMusic() {
+    var paths = [];
+    document.querySelectorAll('#music-list input[name="music"]').forEach(function(input) {
+        paths.push(input.value.trim());
+    });
+    // Filter out empty strings for storage
+    var filtered = paths.filter(function(p) { return p !== ''; });
+    debouncedAutoSave({ music: filtered.length > 0 ? filtered : [] });
+    updateMusicDurationLive();
+}
+
+// Wire birthdate and vignette to auto-save
+document.addEventListener('DOMContentLoaded', function() {
+    var birthdate = document.getElementById('birthdate');
+    if (birthdate) {
+        birthdate.addEventListener('change', function() {
+            autoSaveSettings({ birthdate: this.value });
+        });
+    }
+
+    var vignette = document.getElementById('vignette');
+    if (vignette) {
+        vignette.addEventListener('change', function() {
+            autoSaveSettings({ vignette: this.checked });
+        });
+    }
+});
+
+// -----------------------------------------------------------------------
+// Subject Name Rename
 // -----------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', function() {
-    var form = document.querySelector('.settings-form');
-    if (!form) return;
+    var nameInput = document.getElementById('subject-name-input');
+    if (!nameInput) return;
 
-    var saveBtn = form.querySelector('button[type="submit"]');
-    if (!saveBtn) return;
-
-    // Capture initial values (non-music fields)
-    var initialValues = {};
-    form.querySelectorAll('input:not([name="music"]), select').forEach(function(field) {
-        if (field.type === 'checkbox') {
-            initialValues[field.name] = field.checked;
-        } else {
-            initialValues[field.name] = field.value;
+    function doRename() {
+        var newName = nameInput.value.trim();
+        var original = nameInput.dataset.original;
+        if (!newName || newName === original) {
+            nameInput.value = original;
+            return;
         }
-    });
-
-    // Capture initial music values
-    var initialMusicValues = [];
-    form.querySelectorAll('input[name="music"]').forEach(function(input) {
-        initialMusicValues.push(input.value);
-    });
-
-    function checkForChanges() {
-        var hasChanges = false;
-        form.querySelectorAll('input:not([name="music"]), select').forEach(function(field) {
-            if (!field.name) return;
-            if (field.type === 'checkbox') {
-                if (field.checked !== initialValues[field.name]) hasChanges = true;
-            } else {
-                if (field.value !== initialValues[field.name]) hasChanges = true;
+        fetch('/subjects/' + encodeURIComponent(original) + '/rename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_name: newName }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                alert('Rename failed: ' + data.error);
+                nameInput.value = original;
+            } else if (data.url) {
+                window.location.href = data.url;
             }
+        })
+        .catch(function(err) {
+            alert('Rename failed: ' + err);
+            nameInput.value = original;
         });
-        // Check music fields (count and values may have changed)
-        var currentMusic = [];
-        form.querySelectorAll('input[name="music"]').forEach(function(input) {
-            currentMusic.push(input.value);
-        });
-        if (JSON.stringify(currentMusic) !== JSON.stringify(initialMusicValues)) hasChanges = true;
-
-        saveBtn.disabled = !hasChanges;
-        if (hasChanges) {
-            saveBtn.classList.remove('btn-secondary');
-            saveBtn.classList.add('btn-primary');
-        } else {
-            saveBtn.classList.remove('btn-primary');
-            saveBtn.classList.add('btn-secondary');
-        }
     }
 
-    // Start disabled
-    saveBtn.disabled = true;
-
-    // Use event delegation on the form to catch dynamic inputs
-    form.addEventListener('input', checkForChanges);
-    form.addEventListener('change', checkForChanges);
-
-    // Expose for use by addMusicRow/removeMusicRow
-    window._checkForChanges = checkForChanges;
+    nameInput.addEventListener('blur', doRename);
+    nameInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            nameInput.blur();
+        } else if (e.key === 'Escape') {
+            nameInput.value = nameInput.dataset.original;
+            nameInput.blur();
+        }
+    });
 });
 
 

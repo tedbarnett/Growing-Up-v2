@@ -265,6 +265,56 @@ body {
     margin-bottom: 0.75rem;
 }
 
+/* Editable subject name input */
+.subject-name-input {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0.1rem 0.4rem;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    min-width: 120px;
+    max-width: 100%;
+}
+
+.subject-name-input:hover {
+    border-color: var(--border);
+}
+
+.subject-name-input:focus {
+    background: var(--bg-input);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(214, 78, 106, 0.12);
+}
+
+/* Save indicator */
+.save-indicator {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--success);
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+}
+
+.save-indicator.visible {
+    opacity: 1;
+}
+
+/* Images folder read-only display */
+.images-folder-display {
+    font-size: 0.9rem;
+    padding: 0.4rem 0;
+}
+
+.images-folder-display .path-basename-text {
+    color: #3b82f6;
+    font-weight: 500;
+}
+
 .subject-header h1 {
     font-size: 2rem;
 }
@@ -1126,6 +1176,10 @@ body {
     }
 
     .subject-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .subject-name-input {
         font-size: 1.5rem;
     }
 
